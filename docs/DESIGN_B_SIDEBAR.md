@@ -50,9 +50,26 @@ B is adopted, consider tightening the kernel (e.g. 0-70-30 over 2 LEDs) at
 the Phase 3 optical proof.
 
 Ring geometry: the 24-LED Adafruit ring is 65.5 mm OD vs ~172 mm for 60-LED
-SK6812 rings — a much smaller halo, which interacts with the (deferred)
-industrial design: a smaller halo pair could sit closer to the orb, or the
-whole clock shrinks.
+SK6812 rings. Per the project brief, orb size and lamp dimensions are
+**explicitly free variables** (wood-cube 170 mm form factor is exploratory,
+physical design deferred until Gate 1) — so ring choice must NOT be anchored
+to the current 150 mm orb concept. The lamp scales to the ring, not the
+reverse.
+
+What actually varies with ring choice is angular resolution, and that trades
+against viewing distance:
+
+- 60 LEDs = 6°/pixel, 24 = 15°/pixel, 12 = 30°/pixel. A standard wall clock
+  has 12 hour marks at 30° apart and reads fine — so even 12 is *legible*;
+  the real cost of coarse rings is event-time precision (±half a pixel) and
+  a softer "now" bead, not legibility.
+- A smaller Design B lamp is a desk/nightstand object read at ~0.5–1 m;
+  a larger Design A lamp reads across a room. Coarser pixels hurt less at
+  closer viewing distance — the two effects roughly cancel.
+- Remaining scale-dependent unknown (Phase 3 optical proof, applies to both
+  designs): orb diffusion. A smaller frosted orb puts the 7-LED jewel closer
+  to the glass — shorter throw means more visible hotspots unless the
+  diffuser (frost grade or added film) is tuned to match.
 
 ## Firmware impact
 
