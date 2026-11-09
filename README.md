@@ -12,7 +12,11 @@ An ambient astronomical clock/lamp. Its illuminated orb communicates time throug
 - `docs/ARCHITECTURE_AND_ISSUES.md` — current technical assessment and known limitations.
 - `docs/PERPLEXITY_HANDOFF.md` — context and suggested first task for the receiving assistant.
 - `docs/DEPLOYMENT.md` — GitHub Pages instructions and repository status.
-- `tests/` — preliminary Node test files, not a comprehensive test suite.
+- `tests/` — Node regression tests + Skyfield/de421 golden fixtures.
+- `firmware/` — **ESP32 firmware** (current phase): pure-C, fixture-validated ports of the astronomy and color engines plus the halo renderer, an Arduino app with a REST API for remote configuration and home automation, and host-runnable tests. See `firmware/README.md` and `firmware/api.md`.
+
+## Firmware
+The simulator's math is now running (in source form) as self-sustained device logic for an ESP32: `firmware/src/astronomy.[ch]`, `color_engine.[ch]` and `render.[ch]` are pure C and validated against the same golden fixtures as the browser (`./firmware/test/run_tests.sh` — currently exact on astronomy, 3200/3200 on color). `main.cpp` adds Wi-Fi/NTP timekeeping, NeoPixel output, NVS-persisted configuration and the REST API. The app layer is written but **not yet compiled or flashed** — hardware bring-up is the next milestone (`docs/ROADMAP.md`, Phase 1.5).
 
 ## Run
 Open `index.html` in a browser. To run the tests, from the project root: `node tests/phase1_tests.js` and `node tests/phase2_tests.js` (require Node). To regenerate the astronomy reference fixtures: `pip install skyfield && python3 tests/generate_reference_fixtures.py` (downloads the JPL de421 ephemeris automatically).
