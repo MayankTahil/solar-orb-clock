@@ -20,8 +20,13 @@ Open `app/index.html` in a browser. To run the preliminary tests, from the proje
 ## Status and honesty about validation
 The Phase 1 simulator improves civil-time conversion and daylight color interpolation but still uses approximate Sun/Moon equations in JavaScript. The Skyfield reference is separate. The app has not been fully regression-tested, cross-browser verified, or calibrated against physical LEDs. Existing tests only exercise a few time-zone examples. Do not describe Phase 1 or astronomy as complete.
 
-## Repository
-Public GitHub repo: https://github.com/MayankTahil/solar-orb-clock (`main`). At packaging time, prior attempts to write through the GitHub integration returned HTTP 403, and GitHub Pages deployment has **not** been verified. This ZIP is a portable handoff, not proof of deployment.
+## Repository and live simulator
+Public GitHub repo: https://github.com/MayankTahil/solar-orb-clock (`main`).
+
+Live simulator (GitHub Pages, verified 2026-11-08): https://mayanktahil.github.io/solar-orb-clock/ — the root `index.html` is a copy of `app/index.html`. When the simulator changes, update both files (or change the Pages source to `app/` if we prefer a single source of truth).
+
+## Deployment status
+Deployed and verified. Earlier 403 failures writing through the ChatGPT GitHub integration are resolved; pushes now go through the `gh` CLI.
 
 ## Source provenance
 This package includes original uploaded material, previously generated Phase 1 code, and a new handoff plan. The project description is a synthesis of the prior discussion, not a new set of confirmed hardware specifications.
