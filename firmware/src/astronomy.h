@@ -14,6 +14,10 @@
 #ifndef ORB_ASTRONOMY_H
 #define ORB_ASTRONOMY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ORB_RISE_SET_ALT (-0.833)   /* USNO: 34' refraction + 16' semidiameter */
 
 /* --- dates / civil time --- */
@@ -50,5 +54,9 @@ double orb_unwrap_lerp(double a, double b, double f);      /* minutes-of-day */
 /* Interpolated rise or set for fraction f of the current day. Any of
  * cur/next/next2 may be NAN (no event that day). */
 double orb_smooth_event(double cur, double next, double next2, double f);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ORB_ASTRONOMY_H */

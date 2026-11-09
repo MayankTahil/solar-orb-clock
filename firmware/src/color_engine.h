@@ -5,6 +5,10 @@
 #ifndef ORB_COLOR_H
 #define ORB_COLOR_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct { double r, g, b; } orb_rgb_t;
 
 typedef struct {
@@ -25,5 +29,9 @@ orb_result_t orb_color(double sun_alt, double moon_alt, double illum,
 /* Split white out of RGB and apply the brightness cap -> RGBW 0..255. */
 void orb_rgb_to_rgbw(orb_rgb_t c, double glow, double max_pwm,
                      int *r, int *g, int *b, int *w);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ORB_COLOR_H */

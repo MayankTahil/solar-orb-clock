@@ -13,6 +13,10 @@
 #ifndef ORB_RENDER_H
 #define ORB_RENDER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "color_engine.h"
 
 #define ORB_LED_COUNT      60
@@ -32,5 +36,9 @@ void orb_halo_frame(const double rise_min, const double set_min,
 void orb_ring_to_rgbw(const double frame[ORB_LED_COUNT],
                       orb_rgb_t color, double max_pwm,
                       unsigned char rgbw[ORB_LED_COUNT][4]);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ORB_RENDER_H */
