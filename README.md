@@ -9,6 +9,7 @@ An ambient astronomical clock/lamp. Its illuminated orb communicates time throug
 - `reference/original_project_prompt.md` — original project brief, preserved unchanged.
 - `reference/solar_orb_astronomy.py` — separate Skyfield/JPL-based *desktop reference* astronomy module. **Not integrated into the browser app** and not a verified numerical reference until tested against trusted results.
 - `docs/ROADMAP.md` — prioritized phases, milestones and acceptance criteria.
+- `docs/POWER.md` — Phase 2 power architecture: budget, USB-C PD design, wiring.
 - `docs/ARCHITECTURE_AND_ISSUES.md` — current technical assessment and known limitations.
 - `docs/PERPLEXITY_HANDOFF.md` — context and suggested first task for the receiving assistant.
 - `docs/DEPLOYMENT.md` — GitHub Pages instructions and repository status.
