@@ -4,3 +4,5 @@ node_modules/
 firmware/src/wifi_secrets.h
 firmware/.pio/
 firmware/build/
+firmware/test/test_astronomy
+firmware/test/test_color
