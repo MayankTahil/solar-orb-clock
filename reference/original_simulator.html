@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" href="data:," />
+<title>Solar Orb Clock Simulator</title>
+<style>
+  :root{
+    --bg:#0a0c14; --bg2:#10131f; --panel:#151927; --panel2:#1a1f31;
+    --line:#262c44; --ink:#eef0f8; --muted:#9aa3c0; --faint:#6b7392;
+    --accent:#ffb35c; --accent2:#8fa8e8;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 700px at 50% -10%, #171c30 0%, var(--bg) 55%);
+    color:var(--ink);
+    font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:20px 16px 40px}
+  .topbar{display:block}
+  .lede{max-width:720px;min-width:0}
+  .lede h1{font-size:26px;line-height:1.15;margin:4px 0 6px;font-weight:650;letter-spacing:-.01em}
+  .lede p{margin:0;color:var(--muted);font-size:14.5px;line-height:1.55}
+  /* Year controls live UNDER the header, full width, so nothing is pushed off the right edge on phones */
+  .year-box{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px 10px;text-align:left}
+  .year-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .year-btn{
+    background:var(--accent);border:1px solid var(--accent);color:#23160a;border-radius:999px;
+    padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;
+    touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:40px;
+  }
+  .year-btn.playing{background:var(--panel2);border-color:var(--line);color:var(--ink)}
+  .year-status{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-height:16px;flex:1 1 200px}
+  .year-slider-wrap{margin-top:10px}
+  .year-slider-wrap input[type="range"]{width:100%;accent-color:var(--accent);height:32px}
+  .year-months{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);letter-spacing:.02em;margin-top:2px;padding:0 1px}
+  .year-months span{flex:1;text-align:center}
+  .year-months span:first-child{text-align:left}
+  .year-months span:last-child{text-align:right}
+  @media(max-width:560px){ .year-status{flex:1 1 100%;order:3} .year-months{font-size:9px} }
+
+  /* Save / share box — top of page */
+  .save-box{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px 10px;text-align:left}
+  .save-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .save-copy{flex:1 1 320px;min-width:0}
+  .save-copy h2{margin:0 0 4px;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .save-copy p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}
+  .save-btn{background:var(--accent);border:1px solid var(--accent);color:#23160a;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px}
+  .save-status{margin:8px 0 0;font-size:12.5px;line-height:1.5;color:var(--accent)}
+  .save-status:empty{display:none}
+  .save-steps{margin:10px 0 2px;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.6}
+  .save-steps li{margin:3px 0}
+  .save-steps b{color:var(--ink)}
+
+  .stage{
+    margin-top:18px;background:linear-gradient(180deg,var(--bg2),#0c0f1a);
+    border:1px solid var(--line);border-radius:22px;
+    padding:28px 18px 22px;position:relative;overflow:hidden;
+  }
+  .stage::before{content:"";position:absolute;inset:0;background:radial-gradient(560px 300px at 50% 38%, var(--amb,rgba(255,170,60,.10)), transparent 70%);pointer-events:none;transition:background .3s}
+  .orb-zone{display:flex;flex-direction:column;align-items:center;position:relative}
+  .orb-wrap{position:relative;width:min(76vw,384px);height:min(76vw,384px);flex:none;display:grid;place-items:center}
+  .orb-ring{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:3}
+  .orb{
+    width:83.333%;height:83.333%;border-radius:50%;
+    background:#1a2040;
+    box-shadow:0 0 60px 10px rgba(80,90,160,.25), 0 0 140px 40px rgba(80,90,160,.12);
+    transition:background .25s linear, box-shadow .25s linear;
+    position:relative;
+  }
+  .orb.no-trans{transition:none}
+  .collapse-btn{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .collapse-btn:hover{color:var(--ink)}
+  .card-head,.controls-head{display:flex;align-items:center;gap:8px}
+  .card-head h2,.controls-head h2{margin:0}
+  .is-collapsed .collapsible-body{display:none}
+  #controlsCard .collapsible-body{display:grid;gap:14px}
+  #controlsCard.is-collapsed .collapsible-body{display:none}
+  .chev{display:inline-block;transition:transform .18s}
+  .is-collapsed .chev{transform:rotate(-90deg)}
+  .ring-legend{margin:14px auto 0;max-width:520px;text-align:center;font-size:11.5px;line-height:1.6;color:var(--faint)}
+  .ring-legend b{color:var(--muted);font-weight:650}
+  .ring-legend .sw-sun{color:#ffb35c;font-weight:700}
+  .ring-legend .sw-moon{color:#a9bcf0;font-weight:700}
+  .orb::after{ /* faint physical edge so the disc reads as an object, face stays one pure colour */
+    content:"";position:absolute;inset:0;border-radius:50%;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06), inset 0 -18px 34px rgba(0,0,0,.14), inset 0 14px 26px rgba(255,255,255,.05);
+  }
+  .clock-read{margin-top:22px;text-align:center}
+  .clock-time{font-size:44px;font-weight:640;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .clock-phase{margin-top:7px;font-size:14px;color:var(--accent);font-weight:600}
+  .clock-sub{margin-top:4px;font-size:13px;color:var(--muted)}
+  .swatch-row{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:12px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .swatch{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
+
+  /* solar arc */
+  .arc-wrap{margin:22px auto 0;max-width:560px;width:100%}
+  .arc-wrap svg{width:100%;height:auto;display:block}
+  .arc-legend{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;margin-top:6px;font-size:11.5px;color:var(--muted)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+
+  /* timeline */
+  .timeline{margin:20px auto 0;max-width:760px}
+  .tl-bar{position:relative;height:30px;border-radius:9px;border:1px solid var(--line);overflow:visible}
+  .tl-fill{position:absolute;inset:0;border-radius:9px}
+  .tl-marker{position:absolute;top:-7px;width:2px;height:44px;background:rgba(255,255,255,.55)}
+  .tl-marker span{position:absolute;top:46px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);white-space:nowrap}
+  .tl-marker.moon{background:rgba(160,180,255,.6)}
+  .tl-head{position:absolute;top:-11px;width:14px;height:52px;transform:translateX(-50%);pointer-events:none}
+  .tl-head::before{content:"";position:absolute;left:50%;top:0;width:2.5px;height:52px;background:#fff;transform:translateX(-50%);border-radius:2px;box-shadow:0 0 6px rgba(255,255,255,.7)}
+  .tl-hours{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);margin-top:26px;font-variant-numeric:tabular-nums}
+
+  /* controls */
+  .controls{
+    margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;display:grid;gap:14px;
+  }
+  .ctl-grid{display:grid;grid-template-columns:1fr;gap:12px}
+  .ctl-grid>div{min-width:0}
+  @media(min-width:720px){.ctl-grid{grid-template-columns:1.4fr 1fr}}
+  label.flabel{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:6px;font-weight:650}
+  select,input[type="date"]{
+    width:100%;max-width:100%;min-width:0;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:10px;padding:10px 11px;font-size:16px;font-family:inherit;color-scheme:dark;
+    min-height:44px;position:relative;z-index:2;pointer-events:auto;touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  select{text-overflow:ellipsis}
+  input[type="range"]{touch-action:pan-x;position:relative;z-index:2}
+  button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  .loc-coords{margin-top:6px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .slider-row{display:flex;align-items:center;gap:12px;min-width:0}
+  input[type="range"]{flex:1;min-width:0;accent-color:var(--accent);height:28px}
+  @media(max-width:560px){
+    .slider-row{flex-wrap:wrap}
+    .slider-row input[type="range"]{order:4;flex:1 1 100%}
+    .slider-row .time-big{margin-left:auto}
+  }
+  .btn{
+    background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:10px;
+    padding:9px 14px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;
+  }
+  .btn:hover{border-color:#39426a}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#23160a}
+  .time-big{font-variant-numeric:tabular-nums;font-weight:650;font-size:15px;min-width:86px;text-align:right}
+  .toggle-row{display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between}
+  .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{background:var(--panel2);color:var(--muted);border:0;padding:10px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+  .seg button.on{background:var(--accent);color:#23160a}
+  .hint{font-size:12px;color:var(--faint);line-height:1.5}
+
+  /* info panel */
+  .info{margin-top:16px;display:grid;grid-template-columns:1fr;gap:16px}
+  @media(min-width:720px){.info{grid-template-columns:1fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .card h2{margin:0 0 12px;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700;display:flex;align-items:center;gap:8px}
+  .rows{display:grid;gap:0}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.045)}
+  .row:last-child{border-bottom:0}
+  .row .k{color:var(--muted);font-size:13.5px}
+  .row .v{font-weight:620;font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums}
+  .row .v small{display:block;color:var(--faint);font-weight:500;font-size:11.5px;margin-top:1px}
+  .moonface{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .moonface canvas{flex:none}
+  .moonface .mp-name{font-size:16px;font-weight:650}
+  .moonface .mp-sub{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+  .scalebar{height:10px;border-radius:6px;margin-top:6px;background:linear-gradient(90deg,#0a0e2a 0%,#2c3170 14%,#5a4a8f 24%,#c65b3f 32%,#ff8a3d 40%,#ffb03a 55%,#ffd76a 72%,#ff9e2c 88%,#f2602e 100%)}
+  .scale-lbls{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);margin-top:5px}
+  footer{margin-top:20px;color:var(--faint);font-size:12px;line-height:1.6;max-width:680px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="lede">
+      <h1>One colour, told by the sky</h1>
+      <p>The orb has no hands and no numbers — just a single glowing colour. It warms as the sun climbs, peaks at solar noon, cools through dusk, and at night it answers to the moon instead: indigo silver-blue while the moon is up, deepest navy when it isn't.</p>
+    </div>
+    <div class="save-box" aria-label="Save or share this simulator">
+      <div class="save-row">
+        <div class="save-copy">
+          <h2>Save / share this simulator</h2>
+          <p>This page is a single self-contained file — under 120 KB, with no external fonts, scripts or images and nothing to install. Once it's on your device it runs fully offline, even in airplane mode.</p>
+        </div>
+        <button class="save-btn" id="downloadBtn" type="button">Download standalone HTML</button>
+      </div>
+      <p class="save-status" id="saveStatus" role="status"></p>
+      <ol class="save-steps">
+        <li><b>On iPhone:</b> tap <b>Download standalone HTML</b> above — or, in Safari, use <b>Share → Save to Files</b>. Then reopen the saved file from <b>Files</b> via <b>Share → Open in Safari</b> (or another browser that runs the page). The Files preview itself won't run the controls — that's expected. Once it's open in Safari, every control works and it needs no network at all.</li>
+        <li><b>To share it:</b> text, email or AirDrop the saved <b>solar-orb-clock.html</b> file as an attachment. Whoever receives it just opens it in a browser — no install, no network, no account.</li>
+        <li><b>To check it offline:</b> open the saved copy in Safari, turn on airplane mode and reload — the city picker, date, time slider, Play day, Play whole year, year slider, seasonal palette, event marks and collapse buttons all still work.</li>
+      </ol>
+    </div>
+    <div class="year-box" aria-label="Play whole year controls">
+      <div class="year-row">
+        <button class="year-btn" id="yearPlayBtn" type="button" aria-pressed="false">▶ Play whole year</button>
+        <div class="year-status" id="yearStatus">365 days · 4.8 sec per day · drag the slider to jump to a month</div>
+      </div>
+      <div class="year-slider-wrap">
+        <label class="flabel" for="yearSlider" style="margin-bottom:2px">Year — jump to a month</label>
+        <input type="range" id="yearSlider" min="0" max="364" step="1" value="0" aria-label="Day of year — slide to skip to a month" />
+        <div class="year-months" aria-hidden="true"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="stage" id="stage">
+    <div class="orb-zone">
+      <div class="orb-wrap">
+        <svg class="orb-ring" id="orbRing" viewBox="0 0 360 360" aria-hidden="true">
+          <!-- Event marks, switchable in Controls. All modes keep the same 24h dial:
+               top = midnight, right = 6 AM, bottom = noon, left = 6 PM.
+               · semicircles — previous design: small half-circles on the edge
+               · halo — offset halo: hairline arcs floating outside the orb
+               · perimeter — Hairline Halo ON the edge itself, part of the perimeter (the default)
+               · horizon — one hairline chord through the centre, events as dots on it -->
+          <path id="markSunrise" fill="#ff6a33" fill-opacity="0.95" style="display:none"/>
+          <path id="markSunset" fill="#ff6a33" fill-opacity="0.7" style="display:none"/>
+          <path id="markMoonrise" fill="#ffffff" fill-opacity="0.95" style="display:none"/>
+          <path id="markMoonset" fill="#ffffff" fill-opacity="0.7" style="display:none"/>
+          <!-- Offset halo: daylight arc + fainter moon arc, floating outside the orb -->
+          <path id="haloMoon" fill="none" stroke="#a9bcf0" stroke-width="1.4" stroke-linecap="round" opacity="0.75" style="display:none"/>
+          <path id="haloSun" fill="none" stroke="#ffab4a" stroke-width="1.8" stroke-linecap="round" opacity="0.95" style="display:none"/>
+          <!-- Hairline Halo — on the edge itself (default): sun arc sits exactly on r=150, moon arc just inside it -->
+          <path id="perimMoon" fill="none" stroke="#c9d6f5" stroke-width="2" stroke-linecap="round" opacity="0.85" style="display:none"/>
+          <path id="perimSun" fill="none" stroke="#ffab4a" stroke-width="3" stroke-linecap="round" opacity="0.98" style="display:none"/>
+          <!-- Horizon Chord: hairline through the centre; event dots sit on it, x mapped by time of day -->
+          <g id="horizonGroup" style="display:none">
+            <line x1="32" y1="180" x2="328" y2="180" stroke="#ffffff" stroke-opacity="0.28" stroke-width="1"/>
+            <circle id="horSunrise" r="4" fill="#ffab4a" stroke="#0a0c14" stroke-width="0.8"/>
+            <circle id="horSunset" r="4" fill="#ff6a33" stroke="#0a0c14" stroke-width="0.8"/>
+            <circle id="horMoonrise" r="3.4" fill="#ffffff" stroke="#0a0c14" stroke-width="0.8"/>
+            <circle id="horMoonset" r="3.4" fill="#a9bcf0" stroke="#0a0c14" stroke-width="0.8"/>
+          </g>
+          <!-- Current time: small black dot straddling the edge — half in, half out — travelling around the face -->
+          <circle id="timeDot" r="5" fill="#05060a" stroke="#ffffff" stroke-width="1"/>
+        </svg>
+        <div class="orb" id="orb" role="img" aria-label="Orb showing the current simulated colour"></div>
+      </div>
+      <p class="ring-legend" id="ringLegend">The edge of the face is a 24-hour dial: <b>top = midnight</b>, <b>right = 6 AM</b>, <b>bottom = noon</b>, <b>left = 6 PM</b>. <span id="ringLegendMode">The <b>Hairline Halo — on the edge itself</b> (the default): a hairline that <i>is</i> part of the perimeter — <span class="sw-sun">gold from sunrise to sunset</span>, <span class="sw-moon">pale silver just inside it from moonrise to moonset</span>. Its ends <i>are</i> the events — no separate marks.</span> The <b style="color:#fff">black dot</b> straddling the edge is the current time. Switch styles under <b>Event marks</b> in Controls to compare.</p>
+      <div class="clock-read">
+        <div class="clock-time" id="clockTime">12:00 PM</div>
+        <div class="clock-phase" id="clockPhase">—</div>
+        <div class="clock-sub" id="clockSub">—</div>
+        <div class="swatch-row"><span class="swatch" id="swatch"></span><span id="hexRead">#000000</span><span aria-hidden="true">·</span><span id="kelvinRead">—</span></div>
+      </div>
+    </div>
+
+    <div class="arc-wrap">
+      <svg id="arcSvg" viewBox="0 0 560 218" role="img" aria-label="Diagram of the sun and moon paths across the sky for the chosen day">
+        <!-- night band below horizon -->
+        <rect x="20" y="168" width="520" height="42" rx="6" fill="#11152a"/>
+        <!-- sun path -->
+        <path id="sunPath" fill="none" stroke="#ffb35c" stroke-width="2" stroke-dasharray="5 5" opacity="0.75"/>
+        <!-- moon path -->
+        <path id="moonPath" fill="none" stroke="#8fa8e8" stroke-width="2" stroke-dasharray="2 5" opacity="0.8"/>
+        <!-- horizon -->
+        <line x1="20" y1="168" x2="540" y2="168" stroke="#3a4166" stroke-width="1.5"/>
+        <text x="24" y="162" fill="#6b7392" font-size="10.5">EAST · sunrise</text>
+        <text x="536" y="162" fill="#6b7392" font-size="10.5" text-anchor="end">sunset · WEST</text>
+        <text x="280" y="200" fill="#525b80" font-size="10.5" text-anchor="middle">below the horizon — night</text>
+        <g id="sunDotG"><circle id="sunDot" r="8" fill="#ffd76a" stroke="#fff3d6" stroke-width="2"/></g>
+        <g id="moonDotG"><circle id="moonDot" r="6" fill="#c9d6f5" stroke="#eef2ff" stroke-width="1.5"/></g>
+      </svg>
+      <div class="arc-legend">
+        <span><span class="dot" style="background:#ffd76a"></span>Sun now</span>
+        <span><span class="dot" style="background:#c9d6f5"></span>Moon now</span>
+        <span><span class="dot" style="background:#ffb35c"></span>Sun path</span>
+        <span><span class="dot" style="background:#8fa8e8"></span>Moon path</span>
+      </div>
+    </div>
+
+    <div class="timeline">
+      <div class="tl-bar" id="tlBar">
+        <div class="tl-fill" id="tlFill"></div>
+        <div class="tl-head" id="tlHead"></div>
+      </div>
+      <div class="tl-hours"><span>12 AM</span><span>3 AM</span><span>6 AM</span><span>9 AM</span><span>12 PM</span><span>3 PM</span><span>6 PM</span><span>9 PM</span><span>12 AM</span></div>
+    </div>
+  </section>
+
+  <section class="controls" id="controlsCard" aria-label="Simulation controls">
+    <div class="controls-head" style="margin-bottom:4px">
+      <h2 style="font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700">Controls</h2>
+      <button type="button" class="collapse-btn" data-collapse="controlsCard" aria-expanded="true"><span class="chev">▾</span> Collapse</button>
+    </div>
+    <div class="collapsible-body">
+    <div class="ctl-grid">
+      <div>
+        <label class="flabel" for="locSelect">Location — top 20 US cities</label>
+        <!-- Options are written into the HTML itself (not built by script) so the
+             city picker is present and selectable even in a downloaded copy
+             opened locally on a phone, before / without any script running. -->
+        <select id="locSelect">
+          <option value="0">New York, NY</option>
+          <option value="1">Los Angeles, CA</option>
+          <option value="2">Chicago, IL</option>
+          <option value="3">Houston, TX</option>
+          <option value="4">Phoenix, AZ</option>
+          <option value="5">Philadelphia, PA</option>
+          <option value="6">San Antonio, TX</option>
+          <option value="7">San Diego, CA</option>
+          <option value="8">Dallas, TX</option>
+          <option value="9">Austin, TX</option>
+          <option value="10">Jacksonville, FL</option>
+          <option value="11">Fort Worth, TX</option>
+          <option value="12">San Jose, CA</option>
+          <option value="13">Columbus, OH</option>
+          <option value="14">Charlotte, NC</option>
+          <option value="15">Indianapolis, IN</option>
+          <option value="16">San Francisco, CA</option>
+          <option value="17" selected>Seattle, WA</option>
+          <option value="18">Denver, CO</option>
+          <option value="19">Washington, DC</option>
+        </select>
+        <div class="loc-coords" id="locCoords"></div>
+      </div>
+      <div>
+        <label class="flabel" for="dateInput">Date</label>
+        <input type="date" id="dateInput" />
+      </div>
+    </div>
+
+    <div>
+      <label class="flabel" for="timeSlider">Time of day</label>
+      <div class="slider-row">
+        <button class="btn primary" id="playBtn" type="button">▶ Play day</button>
+        <input type="range" id="timeSlider" min="0" max="1439" step="1" value="720" />
+        <span class="time-big" id="sliderTime">12:00 PM</span>
+        <button class="btn" id="nowBtn" type="button">Now</button>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <label class="flabel">Seasonal palette</label>
+        <div class="seg" role="group" aria-label="Seasonal palette on or off">
+          <button type="button" id="palOn" class="on">On</button>
+          <button type="button" id="palOff">Off</button>
+        </div>
+      </div>
+      <p class="hint" style="margin:0;max-width:430px">On blends four seasonal peak tints through the year — spring blush, summer amber-red, fall russet, winter pale gold. Off keeps the plain warmth scale: deep amber summer peak, pale straw winter peak.</p>
+    </div>
+
+    <div class="toggle-row">
+      <div style="min-width:min(100%,300px);flex:1 1 280px">
+        <label class="flabel" for="markSelect">Event marks — sunrise / sunset / moonrise / moonset</label>
+        <select id="markSelect" aria-label="Event mark style">
+          <option value="perimeter" selected>Hairline Halo — on the edge itself (default)</option>
+          <option value="halo">Offset halo — floating ring around the orb</option>
+          <option value="horizon">Horizon — hairline chord through the centre</option>
+          <option value="semicircles">Edge semicircles — previous design</option>
+          <option value="none">No marks — pure orb</option>
+        </select>
+      </div>
+      <p class="hint" style="margin:0;max-width:430px">The default is the <b>Hairline Halo — on the edge itself</b>: the gold segment <i>is</i> the rim between sunrise and sunset, so there's only ever one circle. Compare it with the <b>Offset halo</b>, which floats the same daylight / moonlight arcs just outside the orb — the orb stays untouched, but there are two silhouettes. <b>Horizon</b> drops the circle entirely: one line through the middle, events as tiny dots along it.</p>
+    </div>
+    </div>
+  </section>
+
+  <section class="info">
+    <div class="card" id="sunCard">
+      <div class="card-head"><h2>☀ Sun &amp; season</h2><button type="button" class="collapse-btn" data-collapse="sunCard" aria-expanded="true"><span class="chev">▾</span> Collapse</button></div>
+      <div class="collapsible-body">
+      <div class="rows">
+        <div class="row"><span class="k">Sunrise</span><span class="v" id="rSunrise">—</span></div>
+        <div class="row"><span class="k">Solar noon</span><span class="v" id="rNoon">—</span></div>
+        <div class="row"><span class="k">Sunset</span><span class="v" id="rSunset">—</span></div>
+        <div class="row"><span class="k">Day length</span><span class="v" id="rDayLen">—</span></div>
+        <div class="row"><span class="k">Sun elevation now</span><span class="v" id="rSunElev">—</span></div>
+        <div class="row"><span class="k">Peak elevation today</span><span class="v" id="rPeakElev">—</span></div>
+        <div class="row"><span class="k">Season</span><span class="v" id="rSeason">—</span></div>
+        <div class="row"><span class="k">Peak tint</span><span class="v" id="rTint">—</span></div>
+      </div>
+      <div class="scalebar" aria-hidden="true"></div>
+      <div class="scale-lbls"><span>Night navy</span><span>Dawn</span><span>Morning</span><span>Solar noon peak</span><span>Dusk</span></div>
+      </div>
+    </div>
+
+    <div class="card" id="moonCard">
+      <div class="card-head"><h2>☾ Moon</h2><button type="button" class="collapse-btn" data-collapse="moonCard" aria-expanded="true"><span class="chev">▾</span> Collapse</button></div>
+      <div class="collapsible-body">
+      <div class="moonface">
+        <canvas id="moonCanvas" width="72" height="72" aria-label="Moon phase illustration"></canvas>
+        <div>
+          <div class="mp-name" id="rMoonName">—</div>
+          <div class="mp-sub" id="rMoonSub">—</div>
+        </div>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="k">Illumination</span><span class="v" id="rMoonIllum">—</span></div>
+        <div class="row"><span class="k">Moonrise</span><span class="v" id="rMoonrise">—</span></div>
+        <div class="row"><span class="k">Moonset</span><span class="v" id="rMoonset">—</span></div>
+        <div class="row"><span class="k">Moon elevation now</span><span class="v" id="rMoonElev">—</span></div>
+        <div class="row"><span class="k">Night glow</span><span class="v" id="rNightGlow">—</span></div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    How to read it: scrub the time slider and the orb follows the sun's arc for that exact date and place — long amber evenings in June, a brief pale-gold midday in December. Press <strong>Play day</strong> to watch a full 24 hours run. At night the sun hands over to the moon: drag to just after sunset on a full-moon date and the orb lifts into indigo silver-blue as the moon rises; on a new-moon night, or after moonset, it settles to its dimmest navy. Sun and moon positions are computed in your browser from standard astronomical formulas (accurate to a few minutes for rise/set times).
+    <br><br>
+    <strong>Play whole year</strong> (under the header) runs one full midnight-to-midnight day in 4.8 seconds per day, so the orb cycles through sunrise, that day's seasonal noon peak, sunset and the moonlit night for every day of the year. Use the year slider directly underneath it to skip ahead — drag to any month and playback continues from there — while the peak tint, day length and the event marks for sunrise, sunset, moonrise and moonset drift with the seasons. Use the <strong>Event marks</strong> pulldown in Controls to compare the Hairline Halo on the edge itself (the default), the offset halo, the Horizon chord, the previous edge semicircles, or no marks at all. Collapse the Controls, Sun and Moon tiles with their Collapse buttons to keep just the orb on screen.
+    <br><br>
+    Using a downloaded copy on your phone: use the <strong>Download standalone HTML</strong> button at the top of this page to save this one self-contained file, then open the saved copy in <strong>Safari</strong> (in Files, tap Share → Open in Safari), not the Files preview — the preview doesn't run the page's controls, which is why the city picker and sliders appear dead there. Once it's open in Safari it works fully offline, with the Hairline Halo on the edge itself as the default event-mark style.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ============ helpers ============ */
+const RAD = Math.PI/180, DEG = 180/Math.PI;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+function hexToRgb(h){h=h.replace('#','');return{r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)};}
+function rgbStr(c,a){return a===undefined?`rgb(${c.r|0},${c.g|0},${c.b|0})`:`rgba(${c.r|0},${c.g|0},${c.b|0},${a})`;}
+function mix(c1,c2,t){return{r:lerp(c1.r,c2.r,t),g:lerp(c1.g,c2.g,t),b:lerp(c1.b,c2.b,t)};}
+function mixHex(h1,h2,t){return mix(hexToRgb(h1),hexToRgb(h2),t);}
+function toHex(c){const p=v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0');return '#'+p(c.r)+p(c.g)+p(c.b);}
+function fmtTime(mins){
+  if(mins===null||mins===undefined||isNaN(mins)) return '—';
+  mins=((mins%1440)+1440)%1440;
+  let h=Math.floor(mins/60), m=Math.floor(mins%60);
+  const ap=h>=12?'PM':'AM'; h=h%12; if(h===0)h=12;
+  return h+':'+String(m).padStart(2,'0')+' '+ap;
+}
+function fmtDur(mins){
+  if(isNaN(mins)) return '—';
+  const h=Math.floor(mins/60), m=Math.round(mins%60);
+  return h+'h '+String(m).padStart(2,'0')+'m';
+}
+/* Safari / file:// hardening: input[type=date] is not reliable everywhere —
+   some Safari versions return an empty or free-typed value, and a downloaded
+   copy opened locally must never crash render() on it. Parse defensively and
+   fall back to today whenever the value isn't a real calendar date. */
+function parseSimDate(){
+  var el=document.getElementById('dateInput');
+  var raw=el && el.value ? String(el.value).trim() : '';
+  var m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(raw);
+  if(m){
+    var yy=+m[1], mm=+m[2], dd=+m[3];
+    var probe=new Date(Date.UTC(yy,mm-1,dd));
+    if(yy>=1900 && yy<=2200 && mm>=1 && mm<=12 && dd>=1 && dd<=31 &&
+       probe.getUTCFullYear()===yy && probe.getUTCMonth()===mm-1 && probe.getUTCDate()===dd){
+      return {y:yy, mo:mm, d:dd};
+    }
+  }
+  var n=new Date();
+  return {y:n.getFullYear(), mo:n.getMonth()+1, d:n.getDate()};
+}
+
+/* ============ astronomy: sun ============ */
+// Returns a Date in UTC for local wall-clock date + minutes at the location.
+// We treat the chosen date/minutes as *local solar wall time* at the location:
+// compute everything from longitude-based solar time so the sim works for any
+// place without a timezone database. Clock readout = local mean time approx.
+function dayOfYear(y,m,d){return Math.floor((Date.UTC(y,m-1,d)-Date.UTC(y,0,0))/864e5);}
+function sunCalc(dateUTC){ // dateUTC: JS Date (UTC instant)
+  const JD = dateUTC.getTime()/864e5 + 2440587.5;
+  const n = JD - 2451545.0;
+  const L = (280.460 + 0.9856474*n) % 360;
+  const g = ((357.528 + 0.9856003*n) % 360) * RAD;
+  const lambda = ((L + 1.915*Math.sin(g) + 0.020*Math.sin(2*g)) % 360) * RAD;
+  const eps = (23.439 - 0.0000004*n) * RAD;
+  const ra = Math.atan2(Math.cos(eps)*Math.sin(lambda), Math.cos(lambda)) * DEG;
+  const dec = Math.asin(Math.sin(eps)*Math.sin(lambda)) * DEG;
+  return {ra:((ra%360)+360)%360, dec, lambdaDeg: lambda*DEG};
+}
+function sunAlt(dateUTC, lat, lon){
+  const {ra, dec} = sunCalc(dateUTC);
+  const JD = dateUTC.getTime()/864e5 + 2440587.5;
+  let gmst = (280.46061837 + 360.98564736629*(JD-2451545)) % 360;
+  let lst = (gmst + lon) % 360; if(lst<0)lst+=360;
+  let ha = lst - ra; if(ha>180)ha-=360; if(ha<-180)ha+=360;
+  const alt = Math.asin(Math.sin(dec*RAD)*Math.sin(lat*RAD)+Math.cos(dec*RAD)*Math.cos(lat*RAD)*Math.cos(ha*RAD))*DEG;
+  const az = Math.atan2(Math.sin(ha*RAD), Math.cos(ha*RAD)*Math.sin(lat*RAD)-Math.tan(dec*RAD)*Math.cos(lat*RAD))*DEG+180;
+  return {alt, az, dec};
+}
+// Build a UTC instant whose *local mean solar time* at lon equals date+mins.
+function localToUTC(y,m,d,mins,lon){
+  const utcMins = mins - lon*4; // 4 minutes per degree
+  return new Date(Date.UTC(y,m-1,d) + utcMins*60000);
+}
+function sunTimes(y,m,d,lat,lon){
+  // sample the day every 4 min in local mean time, find horizon crossings
+  let prev=null, rise=null, set=null, noonMin=720, peak=-90;
+  for(let t=0;t<=1440;t+=4){
+    const alt = sunAlt(localToUTC(y,m,d,t,lon),lat,lon).alt;
+    if(alt>peak){peak=alt;noonMin=t;}
+    if(prev!==null){
+      if(prev.alt<0 && alt>=0 && rise===null) rise = prev.t + (0-prev.alt)/(alt-prev.alt)*4;
+      if(prev.alt>=0 && alt<0) set = prev.t + (0-prev.alt)/(alt-prev.alt)*4;
+    }
+    prev={t,alt};
+  }
+  return {rise, set, noon:noonMin, peak, polar: rise===null&&set===null};
+}
+
+/* ============ astronomy: moon ============ */
+function moonCoords(dateUTC){
+  const d = dateUTC.getTime()/864e5 - 10957.5; // days since J2000 (JD-2451545)
+  const L = ((218.316 + 13.176396*d)%360)*RAD;      // mean longitude
+  const M = ((134.963 + 13.064993*d)%360)*RAD;      // mean anomaly
+  const F = ((93.272 + 13.229350*d)%360)*RAD;       // mean distance
+  const lonE = L + 6.289*RAD*Math.sin(M);
+  const latE = 5.128*RAD*Math.sin(F);
+  const eps = 23.4397*RAD;
+  const x=Math.cos(lonE), y=Math.sin(lonE)*Math.cos(eps)-Math.tan(latE)*Math.sin(eps), z=Math.sin(lonE)*Math.sin(eps)+Math.tan(latE)*Math.cos(eps);
+  const ra=Math.atan2(y,x)*DEG, dec=Math.atan2(z,Math.sqrt(x*x+y*y))*DEG;
+  return {ra:((ra%360)+360)%360, dec};
+}
+function moonAlt(dateUTC, lat, lon){
+  const {ra, dec} = moonCoords(dateUTC);
+  const JD = dateUTC.getTime()/864e5 + 2440587.5;
+  let gmst = (280.46061837 + 360.98564736629*(JD-2451545)) % 360;
+  let lst = (gmst + lon) % 360; if(lst<0)lst+=360;
+  let ha = lst - ra; if(ha>180)ha-=360; if(ha<-180)ha+=360;
+  const alt = Math.asin(Math.sin(dec*RAD)*Math.sin(lat*RAD)+Math.cos(dec*RAD)*Math.cos(lat*RAD)*Math.cos(ha*RAD))*DEG;
+  const az = Math.atan2(Math.sin(ha*RAD), Math.cos(ha*RAD)*Math.sin(lat*RAD)-Math.tan(dec*RAD)*Math.cos(lat*RAD))*DEG+180;
+  return {alt, az};
+}
+function moonIllum(dateUTC){
+  const synodic = 29.53058867;
+  const age = (((dateUTC.getTime()/864e5 + 2440587.5) - 2451550.1) % synodic + synodic) % synodic;
+  const illum = (1 - Math.cos(2*Math.PI*age/synodic))/2;
+  return {age, illum};
+}
+function moonPhaseName(age, illum){
+  if(age<1.2||age>28.6) return 'New Moon';
+  if(age<6.0) return 'Waxing Crescent';
+  if(age<8.4) return 'First Quarter';
+  if(age<13.6) return 'Waxing Gibbous';
+  if(age<16.2) return 'Full Moon';
+  if(age<21.4) return 'Waning Gibbous';
+  if(age<23.8) return 'Last Quarter';
+  return 'Waning Crescent';
+}
+function moonTimes(y,m,d,lat,lon){
+  let prev=null, rise=null, set=null;
+  for(let t=0;t<=1440;t+=6){
+    const alt = moonAlt(localToUTC(y,m,d,t,lon),lat,lon).alt;
+    if(prev!==null){
+      if(prev.alt<0 && alt>=0 && rise===null) rise = prev.t + (0-prev.alt)/(alt-prev.alt)*6;
+      if(prev.alt>=0 && alt<0 && set===null) set = prev.t + (0-prev.alt)/(alt-prev.alt)*6;
+    }
+    prev={t,alt};
+  }
+  return {rise, set};
+}
+
+/* ============ seasonal peak colour ============ */
+const ANCHORS = [ // day-of-year anchors for palette ON
+  {doy:355, hex:'#f0d48c', name:'Winter pale gold'},        // winter solstice
+  {doy: 79, hex:'#f4c493', name:'Spring blush gold'},       // spring equinox (pale gold + pink blush)
+  {doy:172, hex:'#fb7c22', name:'Summer amber–red'},        // summer solstice (amber→orange→hint of red)
+  {doy:266, hex:'#dd7027', name:'Fall russet amber'},       // fall equinox (amber deepening to russet)
+];
+function seasonalPeak(doy, paletteOn, dec){
+  if(!paletteOn){
+    const s = clamp(dec/23.44,-1,1);           // -1 winter solstice, +1 summer (N hemisphere view via declination)
+    const t = (s+1)/2;
+    return {color: mixHex('#eed9a0','#ffab2e',t), name: t>0.66?'Deep amber (simple scale)':(t<0.33?'Pale straw gold (simple scale)':'Warm gold (simple scale)')};
+  }
+  // continuous blend around the year between the four anchors
+  const pts = [
+    {doy:355-365, hex:ANCHORS[0].hex, name:ANCHORS[0].name},
+    ...ANCHORS,
+    {doy:355+365, hex:ANCHORS[0].hex, name:ANCHORS[0].name},
+    {doy: 79+365, hex:ANCHORS[1].hex, name:ANCHORS[1].name},
+  ].sort((a,b)=>a.doy-b.doy);
+  // normalise: find bracketing anchors for this doy (also try doy+365)
+  let dd = doy;
+  let a=null,b=null;
+  for(let i=0;i<pts.length-1;i++){ if(dd>=pts[i].doy && dd<=pts[i+1].doy){a=pts[i];b=pts[i+1];break;} }
+  if(!a){ dd=doy+365; for(let i=0;i<pts.length-1;i++){ if(dd>=pts[i].doy && dd<=pts[i+1].doy){a=pts[i];b=pts[i+1];break;} } }
+  if(!a){ a=pts[0]; b=pts[1]; }
+  const t = (dd-a.doy)/Math.max(1,(b.doy-a.doy));
+  const color = mixHex(a.hex,b.hex,t);
+  const name = t<0.4 ? a.name : (t>0.6 ? b.name : a.name+' → '+b.name.replace(/^(Winter|Spring|Summer|Fall) /,''));
+  return {color, name};
+}
+function seasonName(month, lat){
+  const north = lat>=0;
+  const names = {winter:'Winter',spring:'Spring',summer:'Summer',fall:'Autumn'};
+  let s;
+  if(month===12||month<=2) s='winter'; else if(month<=5) s='spring'; else if(month<=8) s='summer'; else s='fall';
+  if(!north){ s = {winter:'summer',summer:'winter',spring:'fall',fall:'spring'}[s]; }
+  return names[s];
+}
+
+/* ============ orb colour model ============ */
+const NAVY = hexToRgb('#0a0e2a');       // moon below horizon / new moon: dimmest
+const INDIGO = hexToRgb('#43489e');     // moon up, low / partial
+const SILVER = hexToRgb('#b9cdf2');     // full moon high: brightest silver-blue
+function orbColor(sAlt, mAlt, illum, peakColor){
+  if(sAlt >= 0){
+    // day: dawn amber at horizon rising to the seasonal peak colour
+    const dayT = clamp(Math.pow(Math.sin(clamp(sAlt,0,90)*RAD), 0.55), 0, 1);
+    const dawn = hexToRgb('#ff8438');
+    const mid  = hexToRgb('#ffb03a');
+    let c = dayT < 0.45 ? mix(dawn, mid, dayT/0.45) : mix(mid, peakColor, (dayT-0.45)/0.55);
+    return {color:c, glow: 0.35 + dayT*0.65, mode:'day', dayT};
+  }
+  if(sAlt >= -12){
+    // twilight: blend dusk rose down toward night; a rising moon pulls it indigo
+    const tw = clamp((sAlt+12)/12, 0, 1); // 0 deep twilight, 1 sunset
+    let c = mix(hexToRgb('#2c2a63'), hexToRgb('#e2603c'), Math.pow(tw,1.3));
+    if(mAlt > -2){
+      const moonPull = clamp((mAlt+2)/14,0,1) * (0.25 + 0.75*illum);
+      c = mix(c, INDIGO, moonPull*0.55*(1-tw*0.5));
+    }
+    return {color:c, glow: 0.22 + tw*0.3, mode:'twilight', dayT:0};
+  }
+  // night: moon-driven
+  if(mAlt > 0){
+    const elevF = clamp(mAlt/38, 0, 1);
+    const bright = clamp(illum * (0.35 + 0.65*elevF), 0, 1);
+    const c = bright < 0.5 ? mix(NAVY, INDIGO, bright*2) : mix(INDIGO, SILVER, (bright-0.5)*2);
+    return {color:c, glow: 0.10 + bright*0.55, mode:'night-moon', dayT:0, bright};
+  }
+  return {color: NAVY, glow: 0.07, mode:'night-dark', dayT:0, bright:0};
+}
+function kelvinFor(res, sAlt){
+  if(res.mode==='day'){
+    const k = lerp(2100, 5400, res.dayT);
+    return Math.round(k/50)*50 + ' K · daylight';
+  }
+  if(res.mode==='twilight') return '≈ 2,600 K · dusk';
+  if(res.mode==='night-moon') return 'Moonlight · silver-blue';
+  return 'Moonless night';
+}
+
+/* ============ state & UI ============ */
+const LOCATIONS = [ // top 20 US cities by population
+  {name:'New York, NY', lat:40.7128, lon:-74.0060},
+  {name:'Los Angeles, CA', lat:34.0522, lon:-118.2437},
+  {name:'Chicago, IL', lat:41.8781, lon:-87.6298},
+  {name:'Houston, TX', lat:29.7604, lon:-95.3698},
+  {name:'Phoenix, AZ', lat:33.4484, lon:-112.0740},
+  {name:'Philadelphia, PA', lat:39.9526, lon:-75.1652},
+  {name:'San Antonio, TX', lat:29.4241, lon:-98.4936},
+  {name:'San Diego, CA', lat:32.7157, lon:-117.1611},
+  {name:'Dallas, TX', lat:32.7767, lon:-96.7970},
+  {name:'Austin, TX', lat:30.2672, lon:-97.7431},
+  {name:'Jacksonville, FL', lat:30.3322, lon:-81.6557},
+  {name:'Fort Worth, TX', lat:32.7555, lon:-97.3308},
+  {name:'San Jose, CA', lat:37.3387, lon:-121.8853},
+  {name:'Columbus, OH', lat:39.9612, lon:-82.9988},
+  {name:'Charlotte, NC', lat:35.2271, lon:-80.8431},
+  {name:'Indianapolis, IN', lat:39.7684, lon:-86.1581},
+  {name:'San Francisco, CA', lat:37.7749, lon:-122.4194},
+  {name:'Seattle, WA', lat:47.6062, lon:-122.3321},
+  {name:'Denver, CO', lat:39.7392, lon:-104.9903},
+  {name:'Washington, DC', lat:38.9072, lon:-77.0369},
+];
+const $ = id => document.getElementById(id);
+const locSelect=$('locSelect'), dateInput=$('dateInput'),
+      slider=$('timeSlider'), orb=$('orb'), stage=$('stage');
+let paletteOn = true, playing=false, playTimer=null;
+let yearPlaying=false, yearTimer=null, yearIdx=0, yearPlayYear=null;
+let _dayCache = {key:null, st:null, mt:null, vizKey:null, sunD:'', moonD:'', tlBg:''};
+
+/* The <option>s are already in the HTML, so the picker works in a downloaded
+   local copy even before this script runs. Only build them if they are
+   somehow missing, and never overwrite a selection the markup already set. */
+if(!locSelect.options.length){
+  LOCATIONS.forEach((l,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=l.name; locSelect.appendChild(o); });
+  locSelect.value = 17; // Seattle — nearest top-20 city to home
+}
+/* ============ Edge markers on the orb (no ring, no ticks) ============
+   The orb itself is 83.333% of the 360 viewBox, so its edge sits at r=150.
+   Position still reads as a 24h dial: top = midnight, right = 6 AM,
+   bottom = noon, left = 6 PM. A rise is a semicircle bulging OUT above the
+   edge; a set is a semicircle tucked IN below the edge. Sun = red-orange,
+   moon = white. Current time = black dot centred exactly on the edge. */
+const ORB_R = 150;
+let markMode = 'perimeter'; // 'perimeter' | 'halo' | 'horizon' | 'semicircles' | 'none'
+function ringPoint(mins,r){ const th=(mins/1440)*Math.PI*2; return {x:180+Math.sin(th)*r, y:180-Math.cos(th)*r}; }
+function arcPath(startMins, endMins, r){
+  if(startMins===null||startMins===undefined||isNaN(startMins)||endMins===null||endMins===undefined||isNaN(endMins)) return null;
+  let dur = endMins - startMins; if(dur<=0) dur += 1440; if(dur>=1440) return null;
+  const a=ringPoint(startMins,r), b=ringPoint(startMins+dur,r);
+  const large = dur>720 ? 1 : 0;
+  return 'M'+a.x.toFixed(1)+','+a.y.toFixed(1)+' A'+r+','+r+' 0 '+large+' 1 '+b.x.toFixed(1)+','+b.y.toFixed(1);
+}
+function setArc(id, d){ const el=document.getElementById(id); if(!el) return; if(!d){ el.style.display='none'; return; } el.setAttribute('d',d); el.style.display=''; }
+const MARK_LEGENDS = {
+  perimeter: 'The <b>Hairline Halo — on the edge itself</b> (the default): a hairline that <i>is</i> part of the perimeter — <span class="sw-sun">gold from sunrise to sunset</span>, <span class="sw-moon">pale silver just inside it from moonrise to moonset</span>. Its ends <i>are</i> the events — no separate marks.',
+  halo: 'An <b>offset halo floating just outside</b> the orb — <span class="sw-sun">gold arc from sunrise to sunset</span>, <span class="sw-moon">fainter silver arc, a touch further out, from moonrise to moonset</span>. The orb itself stays pure; the halo carries the events.',
+  horizon: 'No circle at all — <b>one hairline through the centre</b> is the horizon. Dots on it read left → right through the day: <span class="sw-sun">gold for sunrise, then sunset</span>, <span class="sw-moon">silver-white for moonrise, then moonset</span> (moon dots sit just off the line so all four stay readable).',
+  semicircles: 'A semicircle sitting <b>above / outside</b> the edge is a rise, one tucked <b>below / inside</b> the edge is a set — <span class="sw-sun">red-orange for sunrise &amp; sunset</span>, <span style="color:#fff;font-weight:700">white for moonrise &amp; moonset</span>.',
+  none: 'No event marks at all — the pure orb, colour only. Sunrise, sunset, moonrise and moonset are still listed in the Sun and Moon tiles below.'
+};
+function semicirclePath(mins, outward){
+  // A true semicircle: diameter lies on the tangent at that point of the edge,
+  // drawn with a real SVG arc (rx = ry = R, exactly half a circle) — no Bézier
+  // dome, no outline. Small and flat so it reads as a quiet notch on the rim.
+  // Endpoints ordered tangent −→+ and the tangent runs clockwise (direction of
+  // increasing time), so sweep=1 bulges radially outward (rise) and sweep=0
+  // bulges inward (set), at every position around the face.
+  const th=(mins/1440)*Math.PI*2;
+  const dx=Math.sin(th), dy=-Math.cos(th);       // radial outward unit
+  const tx=Math.cos(th), ty=Math.sin(th);        // tangent unit
+  const R=9, cx=180+dx*ORB_R, cy=180+dy*ORB_R;
+  const x1=cx-tx*R, y1=cy-ty*R, x2=cx+tx*R, y2=cy+ty*R;
+  const sweep = outward ? 1 : 0;
+  return 'M'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+R+','+R+' 0 0 '+sweep+' '+x2.toFixed(1)+','+y2.toFixed(1)+' Z';
+}
+function setMark(id, mins){
+  const el=document.getElementById(id); if(!el) return;
+  if(markMode!=='semicircles'||mins===null||mins===undefined||isNaN(mins)){ el.style.display='none'; return; }
+  const outward = (id==='markSunrise'||id==='markMoonrise');
+  el.setAttribute('d', semicirclePath(mins, outward));
+  el.style.display='';
+}
+function setHorizonDot(id, mins, y){
+  const el=document.getElementById(id); if(!el) return;
+  if(mins===null||mins===undefined||isNaN(mins)){ el.style.display='none'; return; }
+  el.style.display='';
+  el.setAttribute('cx',(32+(mins/1440)*296).toFixed(1)); el.setAttribute('cy',y);
+}
+function updateRing(st, mt, mins){
+  setMark('markSunrise', st.polar?null:st.rise);
+  setMark('markSunset',  st.polar?null:st.set);
+  setMark('markMoonrise', mt.rise);
+  setMark('markMoonset',  mt.set);
+  // Offset halo — floating outside the orb (sun r=165, moon r=174)
+  setArc('haloSun',  markMode==='halo' && !st.polar ? arcPath(st.rise, st.set, 165) : null);
+  setArc('haloMoon', markMode==='halo' ? arcPath(mt.rise, mt.set, 174) : null);
+  // Hairline Halo — on the edge itself, the default (sun exactly on r=150, moon just inside at r=143)
+  setArc('perimSun',  markMode==='perimeter' && !st.polar ? arcPath(st.rise, st.set, ORB_R) : null);
+  setArc('perimMoon', markMode==='perimeter' ? arcPath(mt.rise, mt.set, ORB_R-7) : null);
+  // Horizon Chord
+  const hg=document.getElementById('horizonGroup');
+  if(hg) hg.style.display = markMode==='horizon' ? '' : 'none';
+  if(markMode==='horizon'){
+    setHorizonDot('horSunrise', st.polar?null:st.rise, 180);
+    setHorizonDot('horSunset',  st.polar?null:st.set, 180);
+    setHorizonDot('horMoonrise', mt.rise, 171);
+    setHorizonDot('horMoonset',  mt.set, 189);
+  }
+  const pt=ringPoint(mins, ORB_R), dot=document.getElementById('timeDot');
+  if(dot){ dot.setAttribute('cx',pt.x.toFixed(1)); dot.setAttribute('cy',pt.y.toFixed(1)); }
+}
+
+const today = new Date();
+if(!dateInput.value){
+  dateInput.value = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+}
+slider.value = today.getHours()*60 + today.getMinutes();
+
+locSelect.addEventListener('change', render); // changing city mid year-play keeps playing, in the new city
+locSelect.addEventListener('input', render);
+dateInput.addEventListener('change', ()=>{ stopYearPlay(); render(); });
+dateInput.addEventListener('input', ()=>{ stopYearPlay(); render(); });
+slider.addEventListener('input', ()=>{ stopPlay(); stopYearPlay(); render(); });
+$('nowBtn').addEventListener('click', ()=>{
+  stopYearPlay();
+  const n=new Date();
+  dateInput.value = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  slider.value = n.getHours()*60+n.getMinutes();
+  render();
+});
+/* Respect whatever the markup already has selected, so a downloaded copy
+   reopens with the same event-mark style and palette it was saved with.
+   (In the hosted page these are simply the defaults: Hairline Halo on the
+   edge itself, seasonal palette on.) */
+markMode = $('markSelect').value || markMode;
+(function(){ var lg=$('ringLegendMode'); if(lg && MARK_LEGENDS[markMode]) lg.innerHTML = MARK_LEGENDS[markMode]; })();
+if($('palOff').classList.contains('on')) paletteOn=false;
+$('markSelect').addEventListener('change', ()=>{
+  markMode = $('markSelect').value;
+  const lg=$('ringLegendMode'); if(lg && MARK_LEGENDS[markMode]) lg.innerHTML = MARK_LEGENDS[markMode];
+  render();
+});
+$('palOn').addEventListener('click', ()=>{ paletteOn=true; $('palOn').classList.add('on'); $('palOff').classList.remove('on'); render(); });
+$('palOff').addEventListener('click', ()=>{ paletteOn=false; $('palOff').classList.add('on'); $('palOn').classList.remove('on'); render(); });
+/* Collapsible tiles: Controls / Sun / Moon can be folded away so only the orb stage stays on screen */
+document.querySelectorAll('[data-collapse]').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var target=document.getElementById(btn.getAttribute('data-collapse'));
+    if(!target) return;
+    var collapsed=target.classList.toggle('is-collapsed');
+    btn.setAttribute('aria-expanded', collapsed?'false':'true');
+    btn.innerHTML = collapsed ? '<span class="chev">▾</span> Expand' : '<span class="chev">▾</span> Collapse';
+  });
+});
+/* ============ Save / share: download this page as one standalone file ============
+   Serializes the current document into a Blob and downloads it as
+   solar-orb-clock.html. Written in plain ES5 style and wrapped in try/catch
+   so it degrades gracefully in older Safari, where blob downloads can open
+   the file in-tab instead — the status line then points at Share → Save to
+   Files. The object URL is revoked on a delay, never immediately, because
+   Safari cancels in-flight downloads if it is revoked too early. */
+(function(){
+  var btn=document.getElementById('downloadBtn');
+  if(!btn) return;
+  btn.addEventListener('click', function(){
+    var status=document.getElementById('saveStatus');
+    function note(msg){ if(status) status.textContent=msg; }
+    try{
+      /* Reflect the current key settings into attributes first, so the saved
+         copy reopens with the same city, date and event-mark style. (Class
+         changes such as the palette toggle are already in the markup.) */
+      try{
+        var sync=function(id){
+          var s=document.getElementById(id); if(!s || !s.options) return;
+          for(var i=0;i<s.options.length;i++){
+            if(i===s.selectedIndex) s.options[i].setAttribute('selected','selected');
+            else s.options[i].removeAttribute('selected');
+          }
+        };
+        sync('locSelect'); sync('markSelect');
+        var di=document.getElementById('dateInput');
+        if(di && di.value) di.setAttribute('value', di.value);
+      }catch(e){}
+      var html='<!doctype html>\n'+document.documentElement.outerHTML;
+      var blob=new Blob([html],{type:'text/html'});
+      var urlApi=window.URL||window.webkitURL;
+      var url=urlApi.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download='solar-orb-clock.html';
+      document.body.appendChild(a);
+      a.click();
+      if(a.parentNode) a.parentNode.removeChild(a);
+      setTimeout(function(){ try{ urlApi.revokeObjectURL(url); }catch(e){} }, 4000);
+      note('Saved as solar-orb-clock.html — look in Downloads or Files, then open it in Safari. If the file opened in this tab instead of downloading (older iOS Safari), tap Share → Save to Files, then reopen it from Files via Share → Open in Safari.');
+    }catch(err){
+      note("The download didn't start in this browser — use Share → Save to Files instead, then reopen the saved file from Files via Share → Open in Safari.");
+    }
+  });
+})();
+
+function stopPlay(){ playing=false; if(playTimer)clearInterval(playTimer); playTimer=null; $('playBtn').textContent='▶ Play day'; }
+$('playBtn').addEventListener('click', ()=>{
+  if(playing){ stopPlay(); return; }
+  stopYearPlay();
+  playing=true; $('playBtn').textContent='⏸ Pause';
+  playTimer=setInterval(()=>{ slider.value=(+slider.value+4)%1440; render(); }, 50);
+});
+
+/* ============ Play whole year — 4.8 seconds per day + month slider ============
+   One full midnight-to-midnight day takes 4.8s, so the orb runs through
+   sunrise -> seasonal noon peak -> sunset -> moonlit night for each day.
+   The slider underneath (0..364) IS the year position: while playing it
+   tracks playback, and dragging it seeks — playback resumes from the
+   dropped day, still at 4.8s/day. A full year at this speed is ~29 min,
+   which is exactly why the slider exists: skip to the month you want. */
+const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_START=[0,31,59,90,120,151,181,212,243,273,304,334];
+const DAY_MS = 4800; // 4.8 seconds per day
+let yearRaf=null, yearLastTs=0, yearDayFloat=0; // fractional day-of-year position
+let yearTotalDays=365; // MUST be declared: the script is strict-mode, so assigning
+                       // to an undeclared yearTotalDays threw a ReferenceError that
+                       // silently killed Play whole year and the year slider.
+function daysInYearFn(y){ return ((y%4===0 && y%100!==0) || y%400===0) ? 366 : 365; }
+function applyYearPosition(){
+  const total=yearTotalDays;
+  const wrapped=((yearDayFloat%total)+total)%total;
+  const dayIdx=Math.floor(wrapped);
+  const minsOfDay=Math.floor((wrapped-dayIdx)*1440);
+  const dt=new Date(Date.UTC(yearPlayYear, 0, 1+dayIdx));
+  const m=dt.getUTCMonth()+1, d=dt.getUTCDate();
+  dateInput.value=yearPlayYear+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  slider.value=minsOfDay;
+  const ys=$('yearSlider'); if(ys) ys.value=dayIdx;
+  const loc=(LOCATIONS[+locSelect.value]||LOCATIONS[0]).name;
+  $('yearStatus').textContent=MONTH_NAMES[m-1]+' '+d+', '+yearPlayYear+' · '+fmtTime(minsOfDay)+' · Day '+(dayIdx+1)+' of '+total+' · '+loc+' · 4.8s/day';
+  render();
+}
+function yearFrame(ts){
+  if(!yearPlaying) return;
+  yearRaf=requestAnimationFrame(yearFrame);
+  if(!yearLastTs) yearLastTs=ts;
+  const dtMs=ts-yearLastTs; yearLastTs=ts;
+  if(dtMs>250) return; // tab was hidden — don't jump
+  yearDayFloat += dtMs/DAY_MS;
+  if(yearDayFloat>=yearTotalDays) yearDayFloat-=yearTotalDays;
+  applyYearPosition();
+}
+function stopYearPlay(keepStatus){
+  yearPlaying=false;
+  if(yearRaf) cancelAnimationFrame(yearRaf);
+  yearRaf=null; yearTimer=null; yearLastTs=0;
+  orb.classList.remove('no-trans');
+  const b=$('yearPlayBtn');
+  if(b){ b.textContent='▶ Play whole year'; b.classList.remove('playing'); b.setAttribute('aria-pressed','false'); }
+  if(!keepStatus) $('yearStatus').textContent='365 days · 4.8 sec per day · drag the slider to jump to a month';
+}
+function startYearPlay(fromDay){
+  stopPlay();
+  yearPlayYear=parseSimDate().y;
+  yearTotalDays=daysInYearFn(yearPlayYear);
+  const ys=$('yearSlider'); if(ys) ys.max=yearTotalDays-1;
+  if(typeof fromDay==='number'){ yearDayFloat=fromDay; }
+  else {
+    // start from the slider if it was scrubbed, else Jan 1
+    yearDayFloat = ys ? (+ys.value||0) : 0;
+    // preserve time of day the user had set, as a fraction into that day
+    yearDayFloat += (+slider.value||0)/1440;
+  }
+  yearPlaying=true;
+  orb.classList.add('no-trans');
+  const b=$('yearPlayBtn');
+  b.textContent='⏸ Pause year'; b.classList.add('playing'); b.setAttribute('aria-pressed','true');
+  yearLastTs=0;
+  applyYearPosition();
+  yearRaf=requestAnimationFrame(yearFrame);
+}
+$('yearPlayBtn').addEventListener('click', ()=>{ yearPlaying ? stopYearPlay(true) : startYearPlay(); });
+(function wireYearSlider(){
+  const ys=$('yearSlider'); if(!ys) return;
+  ys.addEventListener('input', ()=>{
+    const day=+ys.value||0;
+    if(yearPlaying){
+      yearDayFloat=day+(yearDayFloat-Math.floor(yearDayFloat)); yearLastTs=0; applyYearPosition();
+    } else {
+      // Scrubbing while paused: jump the date to that day (keeping time of day), and remember it as the play start
+      yearPlayYear=parseSimDate().y;
+      yearTotalDays=daysInYearFn(yearPlayYear);
+      yearDayFloat=day+(+slider.value||0)/1440;
+      const dt=new Date(Date.UTC(yearPlayYear,0,1+day));
+      const m=dt.getUTCMonth()+1, d=dt.getUTCDate();
+      dateInput.value=yearPlayYear+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      $('yearStatus').textContent=MONTH_NAMES[m-1]+' '+d+', '+yearPlayYear+' · Day '+(day+1)+' — press Play whole year to run at 4.8s/day from here';
+      render();
+    }
+  });
+})();
+
+/* moon face drawing */
+function drawMoon(age, illum){
+  const cv=$('moonCanvas'), ctx=cv.getContext('2d'), R=30, cx=36, cy=36;
+  ctx.clearRect(0,0,72,72);
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fillStyle='#141a33'; ctx.fill();
+  ctx.strokeStyle='#39426a'; ctx.stroke();
+  const waxing = age < 14.77;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.clip();
+  ctx.fillStyle='#dbe6fb';
+  const k = Math.cos(2*Math.PI*age/29.53058867); // terminator factor
+  ctx.beginPath();
+  if(waxing){ ctx.arc(cx,cy,R,-Math.PI/2,Math.PI/2,false); ctx.ellipse(cx,cy,Math.abs(k)*R,R,0,Math.PI/2,-Math.PI/2,k>0); }
+  else { ctx.arc(cx,cy,R,Math.PI/2,Math.PI*1.5,false); ctx.ellipse(cx,cy,Math.abs(k)*R,R,0,-Math.PI/2,Math.PI/2,k>0); }
+  ctx.fill();
+  ctx.restore();
+}
+
+/* arc paths */
+function buildArc(y,m,d,lat,lon,which){
+  // x: 20..540 maps local time 0..24h is wrong for an arc; instead map azimuth-ish:
+  // classic sky arc: x maps hour angle across the day (sunrise left, sunset right is wrong too —
+  // we map *time of day* 0..24 across the width and elevation to height, showing both bodies' daily tracks)
+  let pts=[];
+  for(let t=0;t<=1440;t+=15){
+    const inst=localToUTC(y,m,d,t,lon);
+    const a = which==='sun' ? sunAlt(inst,lat,lon).alt : moonAlt(inst,lat,lon).alt;
+    const x = 20 + (t/1440)*520;
+    const yy = 168 - clamp(a,-32,90)/90*148 + Math.min(0,-a)*0.0; // above horizon up; below handled by clamp into band
+    const y2 = a>=0 ? 168 - (a/90)*148 : 168 + clamp(-a,0,32)/32*34;
+    pts.push(x.toFixed(1)+','+y2.toFixed(1));
+  }
+  return 'M'+pts.join(' L');
+}
+function arcXY(t, alt){
+  const x = 20 + (t/1440)*520;
+  const y = alt>=0 ? 168 - (alt/90)*148 : 168 + clamp(-alt,0,32)/32*34;
+  return {x,y};
+}
+
+/* timeline markers */
+function setMarkers(st, mt){
+  const bar=$('tlBar');
+  bar.querySelectorAll('.tl-marker').forEach(e=>e.remove());
+  const add=(mins,label,moon)=>{
+    if(mins===null||mins===undefined||isNaN(mins))return;
+    const el=document.createElement('div'); el.className='tl-marker'+(moon?' moon':'');
+    el.style.left=(mins/1440*100)+'%';
+    el.innerHTML='<span>'+label+'<br>'+fmtTime(mins)+'</span>';
+    bar.appendChild(el);
+  };
+  add(st.rise,'☀↑',false); add(st.set,'☀↓',false); add(mt.rise,'☾↑',true); add(mt.set,'☾↓',true);
+}
+
+/* ============ render ============ */
+function render(){
+  const loc = LOCATIONS[+locSelect.value] || LOCATIONS[0];
+  const lat = loc.lat, lon = loc.lon;
+  $('locCoords').textContent = loc.name + ' · ' + Math.abs(lat).toFixed(4) + '° ' + (lat>=0?'N':'S') + ', ' + Math.abs(lon).toFixed(4) + '° ' + (lon>=0?'E':'W');
+  const _pd = parseSimDate();
+  const y=_pd.y, mo=_pd.mo, d=_pd.d;
+  const mins = isNaN(+slider.value) ? 720 : +slider.value;
+  const doy = dayOfYear(y,mo,d);
+
+  const inst = localToUTC(y,mo,d,mins,lon);
+  const s = sunAlt(inst,lat,lon);
+  const mn = moonAlt(inst,lat,lon);
+  /* Rise/set times, arc paths and the day spectrum only depend on the date
+     and place, so cache them per day — during Play Whole Year the same day
+     is rendered many times as the hours sweep past, and recomputing them
+     every frame would waste most of the frame budget. */
+  const dayKey = y+'-'+mo+'-'+d+'|'+lat+'|'+lon;
+  if(_dayCache.key !== dayKey){
+    _dayCache = {key:dayKey, st:sunTimes(y,mo,d,lat,lon), mt:moonTimes(y,mo,d,lat,lon), vizKey:null, sunD:'', moonD:'', tlBg:''};
+  }
+  const st = _dayCache.st;
+  const mt = _dayCache.mt;
+  const mi = moonIllum(inst);
+  const peak = seasonalPeak(doy, paletteOn, s.dec);
+
+  const res = orbColor(s.alt, mn.alt, mi.illum, peak.color);
+  const c = res.color, colStr = rgbStr(c), hex = toHex(c);
+  orb.style.background = colStr;
+  orb.style.boxShadow = `0 0 ${50+res.glow*70}px ${8+res.glow*16}px ${rgbStr(c,0.28+res.glow*0.3)}, 0 0 ${130+res.glow*110}px ${30+res.glow*30}px ${rgbStr(c,0.10+res.glow*0.16)}`;
+  stage.style.setProperty('--amb', rgbStr(c, 0.10));
+  $('swatch').style.background = colStr;
+  $('hexRead').textContent = hex.toUpperCase();
+  $('kelvinRead').textContent = kelvinFor(res, s.alt);
+
+  $('clockTime').textContent = fmtTime(mins);
+  $('sliderTime').textContent = fmtTime(mins);
+  let phase, sub;
+  if(res.mode==='day'){
+    phase = s.alt > st.peak*0.82 ? 'Near solar noon — peak warmth' : (mins < st.noon ? 'Morning — warming as the sun climbs' : 'Afternoon — cooling from the peak');
+    sub = 'Sun elevation ' + s.alt.toFixed(1) + '° · warmest at solar noon (' + fmtTime(st.noon) + ')';
+  } else if(res.mode==='twilight'){
+    phase = mins < 720 ? 'Dawn twilight' : 'Dusk twilight';
+    sub = (mins<720 ? 'Sunrise at '+fmtTime(st.rise) : 'Sunset at '+fmtTime(st.set)) + (mn.alt>-2 ? ' · moon already up — indigo creeping in' : '');
+  } else if(res.mode==='night-moon'){
+    phase = 'Night — moon glow';
+    sub = moonPhaseName(mi.age, mi.illum) + ' · ' + Math.round(mi.illum*100) + '% lit · moon elevation ' + mn.alt.toFixed(1) + '°';
+  } else {
+    phase = 'Night — moonless dark';
+    sub = 'Moon is below the horizon · orb at its dimmest navy';
+  }
+  $('clockPhase').textContent = phase;
+  $('clockPhase').style.color = res.mode.startsWith('night') ? '#a9bcf0' : '#ffb35c';
+  $('clockSub').textContent = sub;
+
+  /* info: sun & season */
+  $('rSunrise').textContent = st.polar ? (st.peak>0?'Polar day':'Polar night') : fmtTime(st.rise);
+  $('rSunset').textContent = st.polar ? '—' : fmtTime(st.set);
+  $('rNoon').textContent = fmtTime(st.noon);
+  $('rDayLen').innerHTML = st.polar ? (st.peak>0?'24h daylight':'0h daylight') : fmtDur(st.set-st.rise) + '<small>' + (st.set-st.rise>=720?'long day':'short day') + ' · sunrise→sunset</small>';
+  $('rSunElev').textContent = s.alt.toFixed(1)+'°' + (s.alt<0?' (below horizon)':'');
+  $('rPeakElev').textContent = st.peak.toFixed(1)+'°';
+  const season = seasonName(mo, lat);
+  $('rSeason').innerHTML = season + '<small>declination ' + s.dec.toFixed(1) + '°</small>';
+  $('rTint').innerHTML = (paletteOn ? peak.name : peak.name) + '<small>' + hexFor(peak.color) + (paletteOn?' · seasonal palette ON':' · seasonal palette OFF') + '</small>';
+
+  /* info: moon */
+  const pName = moonPhaseName(mi.age, mi.illum);
+  $('rMoonName').textContent = pName;
+  $('rMoonSub').textContent = 'Moon age ' + mi.age.toFixed(1) + ' days · ' + (mn.alt>0 ? 'currently above the horizon' : 'currently below the horizon');
+  $('rMoonIllum').textContent = Math.round(mi.illum*100)+'%';
+  $('rMoonrise').textContent = mt.rise===null?'No moonrise today':fmtTime(mt.rise);
+  $('rMoonset').textContent = mt.set===null?'No moonset today':fmtTime(mt.set);
+  $('rMoonElev').textContent = mn.alt.toFixed(1)+'°' + (mn.alt<0?' (below horizon)':'');
+  $('rNightGlow').innerHTML = res.mode==='night-moon'
+    ? 'Indigo silver-blue<small>brightness ' + Math.round((res.bright||0)*100) + '% of full-moon peak</small>'
+    : (res.mode==='night-dark' ? 'Deep navy — moon down<small>the orb rests at its coolest</small>' : '— (daytime)<small>night glow follows the moon</small>');
+  drawMoon(mi.age, mi.illum);
+
+  /* arc + day spectrum (cached per day — see above) */
+  const vizKey = dayKey+'|'+(paletteOn?'on':'off')+'|'+toHex(peak.color);
+  if(_dayCache.vizKey !== vizKey){
+    _dayCache.vizKey = vizKey;
+    _dayCache.sunD = buildArc(y,mo,d,lat,lon,'sun');
+    _dayCache.moonD = buildArc(y,mo,d,lat,lon,'moon');
+    let stops=[];
+    for(let t=0;t<=1440;t+=30){
+      const i2=localToUTC(y,mo,d,t,lon);
+      const r2=orbColor(sunAlt(i2,lat,lon).alt, moonAlt(i2,lat,lon).alt, moonIllum(i2).illum, peak.color);
+      stops.push(toHex(r2.color)+' '+(t/1440*100).toFixed(1)+'%');
+    }
+    _dayCache.tlBg = 'linear-gradient(90deg,'+stops.join(',')+')';
+  }
+  $('sunPath').setAttribute('d', _dayCache.sunD);
+  $('moonPath').setAttribute('d', _dayCache.moonD);
+  const sp = arcXY(mins, s.alt), mp = arcXY(mins, mn.alt);
+  $('sunDot').setAttribute('cx',sp.x); $('sunDot').setAttribute('cy',sp.y);
+  $('sunDot').setAttribute('fill', s.alt<0 ? '#5a6080' : '#ffd76a');
+  $('moonDot').setAttribute('cx',mp.x); $('moonDot').setAttribute('cy',mp.y);
+  $('moonDot').setAttribute('fill', mn.alt<0 ? '#4a5478' : '#c9d6f5');
+
+  /* timeline: the orb's colour across the whole day (gradient cached above) */
+  $('tlFill').style.background = _dayCache.tlBg;
+  $('tlHead').style.left = (mins/1440*100)+'%';
+  if(_dayCache.markersKey !== dayKey){ _dayCache.markersKey = dayKey; setMarkers(st, mt); }
+
+  /* 24-hour ring: sunrise / sunset / moonrise / moonset ticks + time dot */
+  updateRing(st, mt, mins);
+}
+function hexFor(c){ return toHex(c).toUpperCase(); }
+
+render();
+</script>
+</body>
+</html>
