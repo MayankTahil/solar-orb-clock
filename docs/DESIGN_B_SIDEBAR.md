@@ -23,13 +23,13 @@ clock runs from plain 5 V USB-C. Two changes do it together:
 
 Using the same per-LED figures as `docs/POWER.md` (40% cap, white-split):
 
-- 55 pixels × ~32 mA pathological all-on ≈ 1.8 A
-- ESP32-S3 + Wi-Fi ≈ 0.15 A
-- **Pathological total ≈ 1.9 A (~9.6 W); realistic worst ≈ 1.2–1.4 A (~6–7 W)**
+- realistic worst day ≈ 0.5 A (~2.5 W); firmware ceiling (every LED at the
+  40% cap) ≈ 0.7 A (~3.5 W); ESP32-S3 + Wi-Fi ~0.15 A included
+- (Figures corrected 2026-11-09 to the per-channel basis in `docs/POWER.md`;
+  the original 1.9 A pathological estimate was ~3x too high.)
 
-vs. 5 V/3 A (15 W) available: 36% headroom at the pathological extreme,
-~2× headroom in realistic operation. No PD trigger, no buck, one USB-C cable
-into any ≥15 W charger.
+vs. 5 V/3 A (15 W) available: 4x+ headroom even at the firmware ceiling.
+No PD trigger, no buck, one USB-C cable into any ≥15 W charger.
 
 ## Resolution trade-off (the real cost)
 
@@ -105,7 +105,50 @@ becomes pure decoration. 24 keeps the 1 LED = 1 hour mapping and still hits
 the no-buck goal. 12 is only interesting if the halo becomes intentionally
 decorative and the build shrinks to a ~40 mm halo — noted as a fallback, not
 the plan. (12 does have one genuine edge: 31 pixels ≈ 1.15 A pathological,
-i.e. runs from literally any 5 V/1.5 A USB port.)
+i.e. runs from literally any 5 V/1.5 A USB port — ceiling ~0.35 A corrected.)
+
+## Design C (added 2026-11-09): single 60-LED ring, blended arcs
+
+User proposal: ONE 60-LED ring carries both arcs. Sun arc = warm gold glow,
+moon arc = darker silver-blue, overlap (both bodies above horizon) = cool
+white/indigo blend, single traveling "now" bead = bright cool white.
+
+### Power (corrected basis, see POWER.md)
+
+67 pixels (60-ring + 7-jewel), 40% cap:
+
+- Realistic worst day (long summer sun arc + moon arc sharing the ring,
+  ~30 gold + ~30 overlap LEDs + bead + jewel + MCU): **~0.8 A (~4 W)**.
+- Absolute firmware ceiling (every LED at cap in the most demanding color):
+  **~0.9 A (~4.3 W)**.
+
+**Verdict: no buck, no PD trigger — a plain 5 V USB-C port (any charger
+≥15 W) runs it, same simple breakout as Design B, while keeping the full
+60-LED 6°/pixel resolution. Best power profile AND best resolution of all
+three designs; arguably the new leading candidate.**
+
+### Rules and notes
+
+- The blend must clamp at `max_pwm` (sun + moon contributions summed then
+  clamped, never stacked). This is nearly free: `orb_ring_to_rgbw` already
+  clamps frame values at 1.0 before scaling.
+- Bead contrast: a bright cool-white bead sitting on an indigo-white overlap
+  region may lose contrast. Phase 3 options: render overlap at ~70% of cap,
+  give the bead a brightness bump, or a 1-LED dark gap ahead of it.
+- Visual storytelling: moon-in-daytime now reads as the blended indigo/white
+  region — arguably clearer than two separate rings. Night = moon arc +
+  bead; day = gold arc + bead; dawn/dusk transitions unchanged.
+- One ring means the front/back halo pair is gone; the orb remains the
+  primary color display, consistent with the original concept.
+
+### Firmware impact
+
+Moderate: call `orb_halo_frame` twice (sun, moon), blend per-LED with a
+weight, color-map per LED (sun color / moon color / blend), add the white
+bead kernel on top with the same clamp. Needs a two-color variant of
+`orb_ring_to_rgbw` and a config flag selecting ring topology (A/B/C).
+No astronomy or color-engine changes; 240 updates/day and bead
+interpolation unchanged.
 
 ## Decision criteria (to resolve at bench / Phase 3)
 
@@ -114,5 +157,5 @@ i.e. runs from literally any 5 V/1.5 A USB port.)
 - If the halo is ambient/indicative (arcs + a traveling glow), 24 is plenty
   and Design B wins on every axis except resolution.
 - Mixed option kept open: 60 front / 24 back is electrically fine (still
-  under the 15 W no-buck budget at ~2.5 A pathological) and worth one bench
+  under the 15 W no-buck budget, corrected ceiling ~1.1 A) and worth one bench
   evening before committing.

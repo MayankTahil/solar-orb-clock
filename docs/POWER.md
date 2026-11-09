@@ -1,38 +1,54 @@
 # Power architecture (Phase 2 pre-work)
 
-Status: design note, not yet bench-validated. Numbers below are computed from the
-firmware's actual RGBW output paths (`firmware/src/main.cpp`, `render.c`,
-`color_engine.c`) with the default `max_pwm = 0.40` cap.
+Status: design note, not yet bench-validated. **CORRECTED 2026-11-09**: the
+original budget applied the ~60 mA all-channels maximum as if it were
+per-channel-sum, overstating per-LED draw ~4x. Corrected basis: ~20 mA per
+channel at full 255 duty; an LED draws (channel-duty-sum / 255) x 20 mA.
+The firmware's RGBW white split also puts white on the W channel alone — a
+full-scale white pixel draws ~20 mA, not 60 mA. Numbers below are corrected.
 
-## Budget
+## Budget (corrected)
 
-LED inventory: 2 x 60-LED RGBW rings + 7-LED RGBW jewel = 127 pixels
-(SK6812-style RGBW, ~60 mA absolute max per pixel, all channels full).
+Per-LED draw at the default `max_pwm = 0.40` cap, actual palette:
 
-Worst-case per LED at the 40% cap, using the firmware's white-channel split
-(min-channel moved to W):
+- sun gold `#ffb35c` full arc: ~11 mA
+- moon silver `#a9bcf0`: ~8 mA
+- indigo/white overlap: ~8–9 mA
+- near-white jewel pixel: ~7–8 mA
+- ESP32-S3 + Wi-Fi: ~150 mA
 
-- Sun ring, gold `#ffb35c`, arc value 1.0: R=65, G=35, B=0, W=37 of 255
-  → ~32 mA. Full 60-LED ring: ~1.9 A.
-- Moon ring, silver `#a9bcf0`: ~24 mA → ~1.45 A for the full ring.
-- Orb jewel (7 px, near-white peak): ~0.2 A.
-- ESP32-S3 + Wi-Fi: ~0.15 A at the 5 V rail.
+Design totals at 5 V:
 
-Both rings are never fully lit at once in normal operation (arcs are
-complementary day/night), so realistic worst case is ~2.3–2.5 A at 5 V
-(~12 W); pathological all-on cap is ~3.7 A (~18.5 W). A plain USB-C port
-without PD negotiation tops out at 5 V/3 A = 15 W — no headroom. The QT Py's
-onboard 3.3 V regulator (600 mA peak) can only ever power the MCU itself.
+| Design | Pixels | Realistic worst day | Firmware ceiling (every LED at cap) |
+|---|---|---|---|
+| A — two 60-LED rings | 127 | ~0.9 A / 4.5 W | ~1.4 A / 7 W |
+| B — two 24-LED rings | 55 | ~0.5 A / 2.5 W | ~0.7 A / 3.5 W |
+| C — one 60-LED ring, blended arcs | 67 | ~0.8 A / 4 W | ~0.9 A / 4.3 W |
 
-**Design target: 5 V at 4 A continuous (20 W).**
+A plain USB-C port without PD negotiation provides 5 V up to 3 A (15 W)
+(https://learn.adafruit.com/usb-pd-hacks/things-to-know) — which now covers
+every design at the default cap with 2–10x headroom. The QT Py's onboard
+3.3 V regulator (600 mA peak) still only powers the MCU itself; LEDs need
+the 5 V bus.
 
-## Decision
+## Decision (revised after correction)
 
-A separate power stage is warranted from the first full-ring bench test
-(Roadmap Phase 1.5 step 3) onward. Bring-up with a short test strip
-(≤20 pixels) can run off the QT Py's own USB port.
+The 12 V trigger + buck chain below was sized on the erroneous figures and
+is now OPTIONAL, not required:
 
-## Architecture: one USB-C port
+- **Simple path (recommended at default cap)**: a USB-C breakout with 5.1 kΩ
+  CC pull-downs (Adafruit product 4090) taps 5 V straight from any USB-C
+  charger ≥15 W. No PD negotiation, no buck. Works for designs A, B and C.
+- **Headroom path (only if raising `max_pwm` above ~0.6 or adding LEDs
+  later)**: the HUSB238 trigger at 12 V + Pololu D36V50F5 buck, as specified
+  in the architecture section below.
+
+Firmware safeguard to add with the simple path: clamp the `max_pwm`
+REST/config value (suggest ≤0.60) so a remote tweak cannot push the clock
+past what a 5 V/3 A port delivers (each 0.1 of cap ≈ 0.25–0.35 A on
+designs A/C).
+
+## Architecture (headroom path, optional): one USB-C port via PD + buck
 
 USB-C PD wall charger (≥30 W) → PD trigger/decoy board set to 12 V →
 5 V buck → 5 V bus feeding rings and the QT Py's 5 V pin.
