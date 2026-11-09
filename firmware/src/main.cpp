@@ -36,8 +36,19 @@
 /* ---- WiFi credentials: copy wifi_secrets.example.h to wifi_secrets.h ---- */
 #include "wifi_secrets.h"
 
-/* ---- pins (from the original project brief; confirm on the bench) ---- */
-static const int ORB_PIN = 6, SUN_RING_PIN = 7, MOON_RING_PIN = 8;
+/* ---- pins (from the original project brief; confirm on the bench) ----
+ * Defaults are the XIAO ESP32-C6 mapping; targets override via build flags
+ * (see platformio.ini). QT Py ESP32-S3 mapping: A0=18 orb, A1=17 sun ring,
+ * A2=9 moon ring (SCL/SDA left free for future STEMMA QT I2C sensors). */
+#ifndef ORB_PIN
+#define ORB_PIN        6
+#endif
+#ifndef SUN_RING_PIN
+#define SUN_RING_PIN   7
+#endif
+#ifndef MOON_RING_PIN
+#define MOON_RING_PIN  8
+#endif
 static const int ORB_LED_N = 7;               /* NeoPixel Jewel */
 
 Adafruit_NeoPixel orb(ORB_LED_N, ORB_PIN, NEO_GRBW + NEO_KHZ800);
