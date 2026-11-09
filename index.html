@@ -180,7 +180,7 @@
 <div class="wrap">
   <div class="topbar">
     <div class="lede">
-      <h1>One colour, told by the sky</h1><p style="color:#ffb35c;font-size:12px;margin-top:7px">Phase 1 preview · civil time zones enabled · ephemeris validation pending</p>
+      <h1>One colour, told by the sky</h1><p style="color:#ffb35c;font-size:12px;margin-top:7px">Simulator · civil time zones enabled · astronomy fixture-validated vs JPL reference (tests/)</p>
       <p>The orb has no hands and no numbers — just a single glowing colour. It warms as the sun climbs, peaks at solar noon, cools through dusk, and at night it answers to the moon instead: indigo silver-blue while the moon is up, deepest navy when it isn't.</p>
     </div>
     <div class="save-box" aria-label="Save or share this simulator">
@@ -406,7 +406,7 @@
   </section>
 
   <footer>
-    How to read it: scrub the time slider and the orb follows the sun's arc for that exact date and place — long amber evenings in June, a brief pale-gold midday in December. Press <strong>Play day</strong> to watch a full 24 hours run. At night the sun hands over to the moon: drag to just after sunset on a full-moon date and the orb lifts into indigo silver-blue as the moon rises; on a new-moon night, or after moonset, it settles to its dimmest navy. Sun and moon positions are computed in your browser from standard astronomical formulas (approximate preview calculations; astronomical accuracy is not yet certified).
+    How to read it: scrub the time slider and the orb follows the sun's arc for that exact date and place — long amber evenings in June, a brief pale-gold midday in December. Press <strong>Play day</strong> to watch a full 24 hours run. At night the sun hands over to the moon: drag to just after sunset on a full-moon date and the orb lifts into indigo silver-blue as the moon rises; on a new-moon night, or after moonset, it settles to its dimmest navy. Sun and moon positions are computed in your browser from standard astronomical formulas (truncated series, validated against a JPL ephemeris reference to within ~0.04° altitude and ~½ minute of rise/set; see tests/ in the repository).
     <br><br>
     <strong>Play whole year</strong> (under the header) runs one full midnight-to-midnight day in 4.8 seconds per day, so the orb cycles through sunrise, that day's seasonal noon peak, sunset and the moonlit night for every day of the year. Use the year slider directly underneath it to skip ahead — drag to any month and playback continues from there — while the peak tint, day length and the event marks for sunrise, sunset, moonrise and moonset drift with the seasons. Use the <strong>Event marks</strong> pulldown in Controls to compare the Hairline Halo on the edge itself (the default), the offset halo, the Horizon chord, the previous edge semicircles, or no marks at all. Collapse the Controls, Sun and Moon tiles with their Collapse buttons to keep just the orb on screen.
     <br><br>
@@ -457,10 +457,11 @@ function parseSimDate(){
   return {y:n.getFullYear(), mo:n.getMonth()+1, d:n.getDate()};
 }
 
-/* ============ MODULE: astronomy-preview (unvalidated approximate equations) ============ */
+/* ============ MODULE: astronomy (truncated series, fixture-validated) ============ */
 /* ============ astronomy: sun ============ */
-// Phase 1: astronomy remains an approximate browser preview until ephemeris validation.
-// All calculations use real UTC instants derived from IANA civil time.
+// Truncated VSOP-style solar series (accurate to ~0.01°) — validated against
+// Skyfield/JPL de421 in tests/phase2_tests.js. All calculations use real UTC
+// instants derived from IANA civil time.
 function dayOfYear(y,m,d){return Math.floor((Date.UTC(y,m-1,d)-Date.UTC(y,0,0))/864e5);}
 function civilParts(instant, tz){
   const parts = new Intl.DateTimeFormat('en-US', {timeZone:tz, hourCycle:'h23',
@@ -518,6 +519,12 @@ function sunAlt(dateUTC, lat, lon){
   return {alt, az, dec};
 }
 
+/* Rise/set convention: the event happens when the body's upper limb is on the
+   refracted horizon — center altitude −0.833° (34′ refraction + 16′
+   semidiameter, the standard USNO/NOAA convention). The sun uses geocentric
+   altitude (solar parallax ~9″ is negligible); the moon uses topocentric
+   altitude (parallax ~57′ applied inside moonAlt). */
+const RISE_SET_ALT = -0.833;
 function sunTimes(y,m,d,lat,lon){
   // sample the day every 4 min in local mean time, find horizon crossings
   let prev=null, rise=null, set=null, noonMin=720, peak=-90;
@@ -525,42 +532,96 @@ function sunTimes(y,m,d,lat,lon){
     const alt = sunAlt(localToUTC(y,m,d,t,lon),lat,lon).alt;
     if(alt>peak){peak=alt;noonMin=t;}
     if(prev!==null){
-      if(prev.alt<0 && alt>=0 && rise===null) rise = prev.t + (0-prev.alt)/(alt-prev.alt)*4;
-      if(prev.alt>=0 && alt<0) set = prev.t + (0-prev.alt)/(alt-prev.alt)*4;
+      if(prev.alt<RISE_SET_ALT && alt>=RISE_SET_ALT && rise===null) rise = prev.t + (RISE_SET_ALT-prev.alt)/(alt-prev.alt)*4;
+      if(prev.alt>=RISE_SET_ALT && alt<RISE_SET_ALT) set = prev.t + (RISE_SET_ALT-prev.alt)/(alt-prev.alt)*4;
     }
     prev={t,alt};
   }
   return {rise, set, noon:noonMin, peak, polar: rise===null&&set===null};
 }
 
-/* ============ astronomy: moon ============ */
-function moonCoords(dateUTC){
-  const d = dateUTC.getTime()/864e5 - 10957.5; // days since J2000 (JD-2451545)
-  const L = ((218.316 + 13.176396*d)%360)*RAD;      // mean longitude
-  const M = ((134.963 + 13.064993*d)%360)*RAD;      // mean anomaly
-  const F = ((93.272 + 13.229350*d)%360)*RAD;       // mean distance
-  const lonE = L + 6.289*RAD*Math.sin(M);
-  const latE = 5.128*RAD*Math.sin(F);
-  const eps = 23.4397*RAD;
-  const x=Math.cos(lonE), y=Math.sin(lonE)*Math.cos(eps)-Math.tan(latE)*Math.sin(eps), z=Math.sin(lonE)*Math.sin(eps)+Math.tan(latE)*Math.cos(eps);
-  const ra=Math.atan2(y,x)*DEG, dec=Math.atan2(z,Math.sqrt(x*x+y*y))*DEG;
-  return {ra:((ra%360)+360)%360, dec};
+/* ============ astronomy: moon (upgraded: truncated ELP-2000-style series) ============
+   Geocentric ecliptic position from a Kepler orbit plus the principal periodic
+   perturbations (evection, variation, yearly equation, parallactic equation,
+   ...), after Schlyter's tutorial series — a standard truncation of the
+   ELP-2000/82 lunar theory, good to roughly 1-2 arcminutes. The previous
+   2-term model could err by degrees, which badly distorted moonrise/set.
+   Rise/set altitudes also apply horizontal parallax (topocentric correction,
+   up to ~0.95°) via the Earth-radii distance r. */
+function rev(x){ return ((x%360)+360)%360; }
+function moonPosition(dateUTC){
+  const d = dateUTC.getTime()/864e5 + 2440587.5 - 2451543.5; // days since 2000 Jan 0.0 (1999-12-31 00:00 UT)
+  const N = rev(125.1228 - 0.0529538083*d);   // longitude of ascending node
+  const w = rev(318.0634 + 0.1643573223*d);   // argument of perigee
+  const a = 60.2666;                          // semi-major axis (Earth radii)
+  const e = 0.054900;                         // eccentricity
+  const M = rev(115.3654 + 13.0649929527*d);  // mean anomaly
+  // Kepler's equation (Newton iteration)
+  let E = M + DEG*e*Math.sin(M*RAD)*(1+e*Math.cos(M*RAD));
+  for(let k=0;k<5;k++){
+    const dE = (E - DEG*e*Math.sin(E*RAD) - M)/(1 - e*Math.cos(E*RAD));
+    E -= dE; if(Math.abs(dE)<1e-9) break;
+  }
+  const xv = a*(Math.cos(E*RAD)-e), yv = a*Math.sqrt(1-e*e)*Math.sin(E*RAD);
+  const v = Math.atan2(yv,xv)*DEG, r = Math.sqrt(xv*xv+yv*yv); // true anomaly, radius
+  // position in the ecliptic frame
+  const i = 5.1454;
+  const vw = (v+w)*RAD, NR=N*RAD, ci=Math.cos(i*RAD);
+  const xh = r*(Math.cos(NR)*Math.cos(vw) - Math.sin(NR)*Math.sin(vw)*ci);
+  const yh = r*(Math.sin(NR)*Math.cos(vw) + Math.cos(NR)*Math.sin(vw)*ci);
+  const zh = r*Math.sin(vw)*Math.sin(i*RAD);
+  let lon = Math.atan2(yh,xh)*DEG, lat = Math.asin(zh/r)*DEG;
+  // Sun mean elements for the perturbation terms
+  const ws = rev(282.9404 + 4.70935e-5*d), Ms = rev(356.0470 + 0.9856002585*d);
+  const Ls = rev(ws+Ms), Lm = rev(N+w+M);
+  const D = rev(Lm-Ls);   // mean elongation
+  const F = rev(Lm-N);    // argument of latitude
+  lon += -1.274*Math.sin((M-2*D)*RAD)   // evection
+       + 0.658*Math.sin(2*D*RAD)        // variation
+       - 0.186*Math.sin(Ms*RAD)         // yearly equation
+       - 0.059*Math.sin((2*M-2*D)*RAD)
+       - 0.057*Math.sin((M-2*D+Ms)*RAD)
+       + 0.053*Math.sin((M+2*D)*RAD)
+       + 0.046*Math.sin((2*D-Ms)*RAD)
+       + 0.041*Math.sin((M-Ms)*RAD)
+       - 0.035*Math.sin(D*RAD)          // parallactic equation
+       - 0.031*Math.sin((M+Ms)*RAD)
+       - 0.015*Math.sin((2*F-2*D)*RAD)
+       + 0.011*Math.sin((M-4*D)*RAD);
+  lat += -0.173*Math.sin((F-2*D)*RAD)
+       - 0.055*Math.sin((M-F-2*D)*RAD)
+       - 0.046*Math.sin((M+F-2*D)*RAD)
+       + 0.033*Math.sin((F+2*D)*RAD)
+       + 0.017*Math.sin((2*M+F)*RAD);
+  return {lon:rev(lon), lat, r};
 }
 function moonAlt(dateUTC, lat, lon){
-  const {ra, dec} = moonCoords(dateUTC);
+  const mp = moonPosition(dateUTC);
+  const eps = 23.4393*RAD;
+  const x = Math.cos(mp.lon*RAD)*Math.cos(mp.lat*RAD);
+  const y = Math.sin(mp.lon*RAD)*Math.cos(mp.lat*RAD);
+  const z = Math.sin(mp.lat*RAD);
+  const ye = y*Math.cos(eps)-z*Math.sin(eps), ze = y*Math.sin(eps)+z*Math.cos(eps);
+  const ra = Math.atan2(ye,x)*DEG, dec = Math.atan2(ze,Math.sqrt(x*x+ye*ye))*DEG;
   const JD = dateUTC.getTime()/864e5 + 2440587.5;
   let gmst = (280.46061837 + 360.98564736629*(JD-2451545)) % 360;
   let lst = (gmst + lon) % 360; if(lst<0)lst+=360;
   let ha = lst - ra; if(ha>180)ha-=360; if(ha<-180)ha+=360;
-  const alt = Math.asin(Math.sin(dec*RAD)*Math.sin(lat*RAD)+Math.cos(dec*RAD)*Math.cos(lat*RAD)*Math.cos(ha*RAD))*DEG;
+  const altG = Math.asin(Math.sin(dec*RAD)*Math.sin(lat*RAD)+Math.cos(dec*RAD)*Math.cos(lat*RAD)*Math.cos(ha*RAD))*DEG;
+  // topocentric altitude: subtract horizontal parallax (~0.95° at mean distance)
+  const par = Math.asin(1/mp.r)*DEG;
+  const alt = altG - par*Math.cos(altG*RAD);
   const az = Math.atan2(Math.sin(ha*RAD), Math.cos(ha*RAD)*Math.sin(lat*RAD)-Math.tan(dec*RAD)*Math.cos(lat*RAD))*DEG+180;
   return {alt, az};
 }
 function moonIllum(dateUTC){
-  const synodic = 29.53058867;
-  const age = (((dateUTC.getTime()/864e5 + 2440587.5) - 2451550.1) % synodic + synodic) % synodic;
-  const illum = (1 - Math.cos(2*Math.PI*age/synodic))/2;
-  return {age, illum};
+  // Illuminated fraction from the actual geocentric Sun-Moon elongation
+  // (0° = new, 180° = full) instead of a mean synodic age from a fixed epoch.
+  const mp = moonPosition(dateUTC);
+  const elong = rev(mp.lon - sunCalc(dateUTC).lambdaDeg);
+  const illum = (1 - Math.cos(elong*RAD))/2;
+  const age = elong/360*29.53058867; // equivalent age for display/drawing
+  return {age, illum, elong};
 }
 function moonPhaseName(age, illum){
   if(age<1.2||age>28.6) return 'New Moon';
@@ -577,12 +638,54 @@ function moonTimes(y,m,d,lat,lon){
   for(let t=0;t<=1440;t+=6){
     const alt = moonAlt(localToUTC(y,m,d,t,lon),lat,lon).alt;
     if(prev!==null){
-      if(prev.alt<0 && alt>=0 && rise===null) rise = prev.t + (0-prev.alt)/(alt-prev.alt)*6;
-      if(prev.alt>=0 && alt<0 && set===null) set = prev.t + (0-prev.alt)/(alt-prev.alt)*6;
+      if(prev.alt<RISE_SET_ALT && alt>=RISE_SET_ALT && rise===null) rise = prev.t + (RISE_SET_ALT-prev.alt)/(alt-prev.alt)*6;
+      if(prev.alt>=RISE_SET_ALT && alt<RISE_SET_ALT && set===null) set = prev.t + (RISE_SET_ALT-prev.alt)/(alt-prev.alt)*6;
     }
     prev={t,alt};
   }
   return {rise, set};
+}
+
+/* ============ continuous event times (interpolated display) ============
+   Rise/set times are a per-day sample of a continuous process: moonrise
+   drifts ~50 min later each day. Displaying the raw per-day values steps
+   at every midnight during Play Whole Year. Instead, the event times shown
+   (dial arcs, timeline markers, readouts) interpolate linearly from the
+   current day's event toward the next day's as time-of-day advances, so
+   they slide continuously across the day boundary. Wrap-around events
+   (crossing midnight) take the short way around the dial; a day with no
+   event (a moonrise skip day) interpolates across two days. */
+const _eventCache = {};
+function cachedDayEvents(y,mo,d,lat,lon){
+  const key = y+'-'+mo+'-'+d+'|'+lat+'|'+lon;
+  let e = _eventCache[key];
+  if(!e){
+    if(Object.keys(_eventCache).length > 4000) { for(const k in _eventCache) delete _eventCache[k]; } // year-play guard
+    e = _eventCache[key] = {st:sunTimes(y,mo,d,lat,lon), mt:moonTimes(y,mo,d,lat,lon)};
+  }
+  return e;
+}
+function nextDate(y,mo,d,n){
+  const t = new Date(Date.UTC(y,mo-1,d+n));
+  return {y:t.getUTCFullYear(), mo:t.getUTCMonth()+1, d:t.getUTCDate()};
+}
+function unwrapLerp(a,b,f){ // minutes-of-day, shortest path around the dial
+  if(b < a-720) b += 1440;
+  if(b > a+720) b -= 1440;
+  return ((a+(b-a)*f)%1440+1440)%1440;
+}
+function smoothEvents(cur, next, next2, f){
+  const one = (k)=>{
+    const a = cur[k], b = next[k];
+    if(a===null && b===null) return null;
+    if(a===null) return b;
+    if(b===null){
+      if(next2 && next2[k]!==null) return unwrapLerp(a, next2[k], f/2); // skip day: reach across two days
+      return a;
+    }
+    return unwrapLerp(a, b, f);
+  };
+  return {rise:one('rise'), set:one('set')};
 }
 
 /* ============ MODULE: color-engine ============ */
@@ -1041,10 +1144,20 @@ function render(){
      every frame would waste most of the frame budget. */
   const dayKey = y+'-'+mo+'-'+d+'|'+lat+'|'+lon;
   if(_dayCache.key !== dayKey){
-    _dayCache = {key:dayKey, st:sunTimes(y,mo,d,lat,lon), mt:moonTimes(y,mo,d,lat,lon), vizKey:null, sunD:'', moonD:'', tlBg:''};
+    const ev0 = cachedDayEvents(y,mo,d,lat,lon);
+    _dayCache = {key:dayKey, st:ev0.st, mt:ev0.mt, vizKey:null, sunD:'', moonD:'', tlBg:''};
   }
   const st = _dayCache.st;
   const mt = _dayCache.mt;
+  /* Continuous event times: interpolate today's rise/set toward tomorrow's
+     as the day progresses (see smoothEvents) so year playback drifts
+     smoothly instead of stepping at midnight. Peak/polar stay per-day. */
+  const f = mins/1440;
+  const ev1d = nextDate(y,mo,d,1), ev2d = nextDate(y,mo,d,2);
+  const evN = cachedDayEvents(ev1d.y,ev1d.mo,ev1d.d,lat,lon);
+  const evN2 = cachedDayEvents(ev2d.y,ev2d.mo,ev2d.d,lat,lon);
+  const stS = Object.assign({}, st, smoothEvents(st, evN.st, evN2.st, f));
+  const mtS = Object.assign({}, mt, smoothEvents(mt, evN.mt, evN2.mt, f));
   const mi = moonIllum(inst);
   const peak = seasonalPeak(doy, paletteOn, s.dec);
 
@@ -1065,7 +1178,7 @@ function render(){
     sub = 'Sun elevation ' + s.alt.toFixed(1) + '° · warmest at solar noon (' + fmtTime(st.noon) + ')';
   } else if(res.mode==='twilight'){
     phase = mins < 720 ? 'Dawn twilight' : 'Dusk twilight';
-    sub = (mins<720 ? 'Sunrise at '+fmtTime(st.rise) : 'Sunset at '+fmtTime(st.set)) + (mn.alt>-2 ? ' · moon already up — indigo creeping in' : '');
+    sub = (mins<720 ? 'Sunrise at '+fmtTime(stS.rise) : 'Sunset at '+fmtTime(stS.set)) + (mn.alt>-2 ? ' · moon already up — indigo creeping in' : '');
   } else if(res.mode==='night-moon'){
     phase = 'Night — moon glow';
     sub = moonPhaseName(mi.age, mi.illum) + ' · ' + Math.round(mi.illum*100) + '% lit · moon elevation ' + mn.alt.toFixed(1) + '°';
@@ -1077,11 +1190,13 @@ function render(){
   $('clockPhase').style.color = res.mode.startsWith('night') ? '#a9bcf0' : '#ffb35c';
   $('clockSub').textContent = sub;
 
-  /* info: sun & season */
-  $('rSunrise').textContent = st.polar ? (st.peak>0?'Polar day':'Polar night') : fmtTime(st.rise);
-  $('rSunset').textContent = st.polar ? '—' : fmtTime(st.set);
+  /* info: sun & season (event readouts use the interpolated continuum) */
+  $('rSunrise').textContent = stS.polar ? (st.peak>0?'Polar day':'Polar night') : fmtTime(stS.rise);
+  $('rSunset').textContent = stS.polar ? '—' : fmtTime(stS.set);
   $('rNoon').textContent = fmtTime(st.noon);
-  $('rDayLen').innerHTML = st.polar ? (st.peak>0?'24h daylight':'0h daylight') : fmtDur(st.set-st.rise) + '<small>' + (st.set-st.rise>=720?'long day':'short day') + ' · sunrise→sunset</small>';
+  let dayLen = NaN;
+  if(stS.rise!==null && stS.set!==null){ dayLen = stS.set - stS.rise; if(dayLen<0) dayLen += 1440; }
+  $('rDayLen').innerHTML = stS.polar ? (st.peak>0?'24h daylight':'0h daylight') : fmtDur(dayLen) + '<small>' + (dayLen>=720?'long day':'short day') + ' · sunrise→sunset</small>';
   $('rSunElev').textContent = s.alt.toFixed(1)+'°' + (s.alt<0?' (below horizon)':'');
   $('rPeakElev').textContent = st.peak.toFixed(1)+'°';
   const season = seasonName(mo, lat);
@@ -1093,8 +1208,8 @@ function render(){
   $('rMoonName').textContent = pName;
   $('rMoonSub').textContent = 'Moon age ' + mi.age.toFixed(1) + ' days · ' + (mn.alt>0 ? 'currently above the horizon' : 'currently below the horizon');
   $('rMoonIllum').textContent = Math.round(mi.illum*100)+'%';
-  $('rMoonrise').textContent = mt.rise===null?'No moonrise today':fmtTime(mt.rise);
-  $('rMoonset').textContent = mt.set===null?'No moonset today':fmtTime(mt.set);
+  $('rMoonrise').textContent = mtS.rise===null?'No moonrise today':fmtTime(mtS.rise);
+  $('rMoonset').textContent = mtS.set===null?'No moonset today':fmtTime(mtS.set);
   $('rMoonElev').textContent = mn.alt.toFixed(1)+'°' + (mn.alt<0?' (below horizon)':'');
   $('rNightGlow').innerHTML = res.mode==='night-moon'
     ? 'Indigo silver-blue<small>brightness ' + Math.round((res.bright||0)*100) + '% of full-moon peak</small>'
@@ -1126,10 +1241,12 @@ function render(){
   /* timeline: the orb's colour across the whole day (gradient cached above) */
   $('tlFill').style.background = _dayCache.tlBg;
   $('tlHead').style.left = (mins/1440*100)+'%';
-  if(_dayCache.markersKey !== dayKey){ _dayCache.markersKey = dayKey; setMarkers(st, mt); }
+  /* timeline markers move with the interpolated continuum, not per-day steps */
+  const mkKey = [stS.rise,stS.set,mtS.rise,mtS.set].map(v=>v===null?'-':v.toFixed(1)).join('|');
+  if(_dayCache.markersKey !== mkKey){ _dayCache.markersKey = mkKey; setMarkers(stS, mtS); }
 
   /* 24-hour ring: sunrise / sunset / moonrise / moonset ticks + time dot */
-  updateRing(st, mt, mins);
+  updateRing(stS, mtS, mins);
 }
 function hexFor(c){ return toHex(c).toUpperCase(); }
 

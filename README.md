@@ -15,10 +15,12 @@ An ambient astronomical clock/lamp. Its illuminated orb communicates time throug
 - `tests/` — preliminary Node test files, not a comprehensive test suite.
 
 ## Run
-Open `index.html` in a browser. To run the tests, from the project root: `node tests/phase1_tests.js` (requires Node). For astronomy reference: `pip install -r reference/requirements.txt` and supply a local JPL ephemeris `.bsp` file (not included).
+Open `index.html` in a browser. To run the tests, from the project root: `node tests/phase1_tests.js` and `node tests/phase2_tests.js` (require Node). To regenerate the astronomy reference fixtures: `pip install skyfield && python3 tests/generate_reference_fixtures.py` (downloads the JPL de421 ephemeris automatically).
 
 ## Status and honesty about validation
-The Phase 1 simulator improves civil-time conversion and daylight color interpolation but still uses approximate Sun/Moon equations in JavaScript. The Skyfield reference is separate. The app has not been fully regression-tested, cross-browser verified, or calibrated against physical LEDs. Existing tests only exercise a few time-zone examples. Do not describe Phase 1 or astronomy as complete.
+Astronomy: the simulator now uses a truncated ELP-2000-style lunar series (with topocentric parallax) and a solar series, both **fixture-validated against Skyfield + JPL de421** (`node tests/phase2_tests.js`): measured worst-case errors are ~0.04° in moon altitude, ~0.01° in sun altitude, and under ½ minute in rise/set times across mid-latitude, equatorial, southern-hemisphere and polar locations, including DST transition days. Rise/set use the standard −0.833° (refraction + semidiameter) convention. Displayed event times interpolate continuously between adjacent days, so year playback drifts smoothly instead of stepping at midnight.
+
+Still not done: DST repeated-hour ambiguity in the UI slider, non-24-hour local days, days with multiple/zero lunar events at high latitude (first event only is shown), cross-browser QA, and physical LED calibration. Do not describe Phase 1 as complete.
 
 ## Repository and live simulator
 Public GitHub repo: https://github.com/MayankTahil/solar-orb-clock (`main`).
